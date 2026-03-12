@@ -1,0 +1,6 @@
+@ChatKingsApp_HostAddress = http://localhost:5166
+
+GET {{ChatKingsApp_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
