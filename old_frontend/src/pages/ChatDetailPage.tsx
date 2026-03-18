@@ -166,7 +166,6 @@ const ChatDetailPage = () => {
   const king         = chat.members.find((m) => m.isKing);
   const kingUser     = king ? getUserById(king.userId) : null;
   const myMembership = chat.members.find((m) => m.userId === currentUser.id);
-  const isKing       = myMembership?.isKing || false;
   const isLockedOut  = currentUser.strikes >= 3;
   const prediction   = chat.activePrediction;
 
@@ -270,10 +269,23 @@ const ChatDetailPage = () => {
         </div>
       )}
 
-      {/* Make Prediction (King) */}
-      {isKing && (
+      {/* Make Prediction (No Active Prediction) */}
+      {!prediction && (
         <div className="mx-3 mt-3">
-          <MakePredictionDialog />
+          <MakePredictionDialog
+            trigger={
+              <button
+                type="button"
+                disabled={isLockedOut}
+                className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-xl border border-ck-gold/30 bg-ck-gold/10 py-3 text-sm font-bold text-ck-gold transition-colors hover:bg-ck-gold/20",
+                  isLockedOut && "cursor-not-allowed opacity-50 hover:bg-ck-gold/10",
+                )}
+              >
+                Make a prediction
+              </button>
+            }
+          />
         </div>
       )}
 
