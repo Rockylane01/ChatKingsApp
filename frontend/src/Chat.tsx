@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Message = {
@@ -7,6 +7,20 @@ type Message = {
   text: string
   timestamp: string
   isOwn: boolean
+}
+
+type Sport = 'Basketball' | 'Football'
+type PredictionCategory = 'Points' | 'Stats'
+
+type Prediction = {
+  sport: Sport
+  category: PredictionCategory
+  text: string
+  minPoints: number
+  maxPoints: number
+  dueBy: string
+  createdAt: string
+  createdBy: 'You'
 }
 
 const placeholderMessages: Message[] = [
@@ -36,6 +50,43 @@ const placeholderMessages: Message[] = [
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>(placeholderMessages)
   const [input, setInput] = useState('')
+  const [isPredictionOpen, setIsPredictionOpen] = useState(false)
+  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(null)
+  const [isEditingPrediction, setIsEditingPrediction] = useState(false)
+  const [predictionDraft, setPredictionDraft] = useState({
+    sport: 'Basketball' as Sport,
+    category: 'Points' as PredictionCategory,
+    text: '',
+    minPoints: 10,
+    maxPoints: 100,
+    dueBy: '',
+  })
+  const [predictionTouched, setPredictionTouched] = useState(false)
+  const predictionSportRef = useRef<HTMLSelectElement | null>(null)
+
+  const closePrediction = useCallback(() => {
+    setIsPredictionOpen(false)
+    setPredictionTouched(false)
+    setIsEditingPrediction(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isPredictionOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePrediction()
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+    predictionSportRef.current?.focus()
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [closePrediction, isPredictionOpen])
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,6 +106,71 @@ export default function Chat() {
     // This will later be replaced with a call to your backend/database
     setMessages((prev) => [...prev, newMessage])
     setInput('')
+  }
+
+  const predictionErrors = (() => {
+    const errors: string[] = []
+    if (!predictionDraft.text.trim()) errors.push('Enter a prediction.')
+    if (!predictionDraft.dueBy) errors.push('Add a bet due-by time.')
+
+    const min = Number(predictionDraft.minPoints)
+    const max = Number(predictionDraft.maxPoints)
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) errors.push('Enter valid point values.')
+    if (min < 0 || max < 0) errors.push('Points must be 0 or more.')
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+      errors.push('Minimum points must be less than or equal to maximum points.')
+    }
+
+    return errors
+  })()
+
+  const canSubmitPrediction = predictionErrors.length === 0
+
+  const handleSubmitPrediction = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPredictionTouched(true)
+    if (!canSubmitPrediction) return
+
+    const newPrediction: Prediction = {
+      sport: predictionDraft.sport,
+      category: predictionDraft.category,
+      text: predictionDraft.text.trim(),
+      minPoints: Number(predictionDraft.minPoints),
+      maxPoints: Number(predictionDraft.maxPoints),
+      dueBy: predictionDraft.dueBy,
+      createdAt: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      createdBy: 'You',
+    }
+
+    setCurrentPrediction(newPrediction)
+    closePrediction()
+    setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }))
+  }
+
+  const formatDueBy = (dueBy: string) => {
+    const parsed = new Date(dueBy)
+    if (!Number.isFinite(parsed.getTime())) return dueBy
+    return parsed.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  }
+
+  const handleDeletePrediction = () => {
+    setCurrentPrediction(null)
+  }
+
+  const handleEditPrediction = () => {
+    if (!currentPrediction) return
+    setPredictionDraft({
+      sport: currentPrediction.sport,
+      category: currentPrediction.category,
+      text: currentPrediction.text,
+      minPoints: currentPrediction.minPoints,
+      maxPoints: currentPrediction.maxPoints,
+      dueBy: currentPrediction.dueBy,
+    })
+    setPredictionTouched(false)
+    setIsEditingPrediction(true)
+    setIsPredictionOpen(true)
   }
 
   return (
@@ -85,6 +201,15 @@ export default function Chat() {
             <p className="chat-subtitle">
               Squad up with real friends, place friendly point bets, and track who wears the crown.
             </p>
+            <div className="chat-title-actions">
+              <button
+                type="button"
+                className="make-prediction-button"
+                onClick={() => setIsPredictionOpen(true)}
+              >
+                Make a Prediction
+              </button>
+            </div>
           </div>
         </div>
         <div className="chat-meta">
@@ -95,6 +220,81 @@ export default function Chat() {
 
       <main className="chat-layout">
         <section className="chat-panel">
+          {currentPrediction && (
+            <div className="prediction-banner" role="status" aria-live="polite">
+              <div className="prediction-banner-top">
+                <span className="prediction-badge">Current Prediction</span>
+                <div className="prediction-right">
+                  <span className="prediction-meta">
+                    {currentPrediction.sport} · {currentPrediction.category} · Bet due by{' '}
+                    {formatDueBy(currentPrediction.dueBy)}
+                  </span>
+                  {currentPrediction.createdBy === 'You' && (
+                    <div className="prediction-actions" aria-label="Prediction actions">
+                      <button
+                        type="button"
+                        className="prediction-icon-button"
+                        onClick={handleEditPrediction}
+                        aria-label="Edit prediction"
+                        title="Edit"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M16.862 3.487a2.25 2.25 0 0 1 3.182 3.182l-9.94 9.94a2.25 2.25 0 0 1-.953.57l-3.25 1.083a.75.75 0 0 1-.949-.949l1.083-3.25a2.25 2.25 0 0 1 .57-.953l9.94-9.94Zm2.121 1.061a.75.75 0 0 0-1.06 0l-.88.879 1.06 1.061.88-.88a.75.75 0 0 0 0-1.06ZM16.0 7.55l-8.84 8.84a.75.75 0 0 0-.19.317l-.61 1.83 1.83-.61a.75.75 0 0 0 .317-.19l8.84-8.84L16 7.55Z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M4.5 20.25A1.5 1.5 0 0 1 3 18.75V9A1.5 1.5 0 0 1 4.5 7.5h6a.75.75 0 0 1 0 1.5h-6v9.75h9.75v-6a.75.75 0 0 1 1.5 0v6a1.5 1.5 0 0 1-1.5 1.5H4.5Z"
+                            opacity="0.35"
+                          />
+                        </svg>
+                        <span className="prediction-action-text">Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="prediction-icon-button danger"
+                        onClick={handleDeletePrediction}
+                        aria-label="Delete prediction"
+                        title="Delete"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M9 3.75A2.25 2.25 0 0 1 11.25 1.5h1.5A2.25 2.25 0 0 1 15 3.75V5h4.5a.75.75 0 0 1 0 1.5H18.2l-1.02 14.02A2.25 2.25 0 0 1 14.94 22.5H9.06a2.25 2.25 0 0 1-2.24-1.98L5.8 6.5H4.5a.75.75 0 0 1 0-1.5H9V3.75Zm1.5 0V5h3V3.75a.75.75 0 0 0-.75-.75h-1.5a.75.75 0 0 0-.75.75Z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M9.75 10.5a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Zm4.5 0a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Z"
+                            opacity="0.8"
+                          />
+                        </svg>
+                        <span className="prediction-action-text">Delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="prediction-banner-body">
+                <p className="prediction-text">{currentPrediction.text}</p>
+                <div className="prediction-range">
+                  Bet range: <strong>{currentPrediction.minPoints}</strong>–<strong>{currentPrediction.maxPoints}</strong> pts
+                </div>
+              </div>
+            </div>
+          )}
           <div className="chat-messages">
             {messages.map((m) => (
               <div
@@ -151,7 +351,160 @@ export default function Chat() {
           </div>
         </aside>
       </main>
+
+      {isPredictionOpen && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closePrediction()
+          }}
+        >
+          <div className="modal-shell" role="dialog" aria-modal="true" aria-label="Make a Prediction">
+            <div className="modal-header">
+              <h2 className="modal-title">{isEditingPrediction ? 'Edit Prediction' : 'Make a Prediction'}</h2>
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="Close"
+                onClick={closePrediction}
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="modal-body" onSubmit={handleSubmitPrediction}>
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-sport">
+                  Select Sport
+                </label>
+                <select
+                  id="prediction-sport"
+                  className="modal-control"
+                  ref={predictionSportRef}
+                  value={predictionDraft.sport}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({ ...prev, sport: e.target.value as Sport }))
+                  }
+                >
+                  <option value="Basketball">Basketball</option>
+                  <option value="Football">Football</option>
+                </select>
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-category">
+                  Prediction Category
+                </label>
+                <select
+                  id="prediction-category"
+                  className="modal-control"
+                  value={predictionDraft.category}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      category: e.target.value as PredictionCategory,
+                    }))
+                  }
+                >
+                  <option value="Points">Points</option>
+                  <option value="Stats">Stats</option>
+                </select>
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-text">
+                  Enter Your Prediction
+                </label>
+                <input
+                  id="prediction-text"
+                  type="text"
+                  className="modal-control"
+                  placeholder="E.g., Over 100 points, Team A wins, etc."
+                  value={predictionDraft.text}
+                  onChange={(e) => setPredictionDraft((prev) => ({ ...prev, text: e.target.value }))}
+                  onBlur={() => setPredictionTouched(true)}
+                />
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-dueby">
+                  Bet due by
+                </label>
+                <input
+                  id="prediction-dueby"
+                  type="datetime-local"
+                  className="modal-control"
+                  value={predictionDraft.dueBy}
+                  onChange={(e) => setPredictionDraft((prev) => ({ ...prev, dueBy: e.target.value }))}
+                  onBlur={() => setPredictionTouched(true)}
+                />
+                <div className="modal-help">
+                  For now, use the game start time so everyone knows when picks lock.
+                </div>
+              </div>
+
+              <div className="modal-grid">
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="prediction-min">
+                    Minimum Points to Bet
+                  </label>
+                  <input
+                    id="prediction-min"
+                    type="number"
+                    className="modal-control"
+                    min={0}
+                    step={1}
+                    value={predictionDraft.minPoints}
+                    onChange={(e) =>
+                      setPredictionDraft((prev) => ({
+                        ...prev,
+                        minPoints: Number(e.target.value),
+                      }))
+                    }
+                    onBlur={() => setPredictionTouched(true)}
+                  />
+                </div>
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="prediction-max">
+                    Maximum Points to Bet
+                  </label>
+                  <input
+                    id="prediction-max"
+                    type="number"
+                    className="modal-control"
+                    min={0}
+                    step={1}
+                    value={predictionDraft.maxPoints}
+                    onChange={(e) =>
+                      setPredictionDraft((prev) => ({
+                        ...prev,
+                        maxPoints: Number(e.target.value),
+                      }))
+                    }
+                    onBlur={() => setPredictionTouched(true)}
+                  />
+                </div>
+              </div>
+
+              {predictionTouched && predictionErrors.length > 0 && (
+                <div className="modal-error" role="alert">
+                  {predictionErrors[0]}
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="modal-secondary-button" onClick={closePrediction}>
+                  Cancel
+                </button>
+                <button type="submit" className="modal-primary-button" disabled={!canSubmitPrediction}>
+                  {isEditingPrediction ? 'Save Prediction' : 'Make Prediction'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
