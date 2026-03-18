@@ -23,35 +23,26 @@ type Prediction = {
   createdBy: 'You'
 }
 
-const placeholderMessages: Message[] = [
-  {
-    id: 1,
-    sender: 'Teammate',
-    text: 'Locked in a 25-point friendly bet on the Sunday night game. Loser brings snacks next week.',
-    timestamp: '9:12 AM',
-    isOwn: false,
-  },
-  {
-    id: 2,
-    sender: 'Teammate',
-    text: 'I&apos;m tossing 10 points on the under with you instead of hitting the real book. Team parlay energy only.',
-    timestamp: '9:14 AM',
-    isOwn: false,
-  },
-  {
-    id: 3,
-    sender: 'You',
-    text: 'Deal. Let&apos;s keep it all in points tonight and see who ends up the Team King by Monday.',
-    timestamp: '9:16 AM',
-    isOwn: true,
-  },
-]
+type BetResponse = {
+  bet_id: number
+  chat_id: number
+  game_id: number
+  user_id: number
+  bet_category: string
+  prediction_details_json: string
+  points_wagered: number
+  status: string
+  placed_at: string
+  resolved_at: string | null
+}
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>(placeholderMessages)
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isPredictionOpen, setIsPredictionOpen] = useState(false)
   const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(null)
+  const [currentBetId, setCurrentBetId] = useState<number | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [isEditingPrediction, setIsEditingPrediction] = useState(false)
   const [predictionDraft, setPredictionDraft] = useState({
     sport: 'Basketball' as Sport,
@@ -68,6 +59,24 @@ export default function Chat() {
     setIsPredictionOpen(false)
     setPredictionTouched(false)
     setIsEditingPrediction(false)
+    setSubmitError(null)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/messages?chatId=1')
+      .then((res) => res.json())
+      .then((data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }>) => {
+        setMessages(
+          data.map((m) => ({
+            id: m.message_id,
+            sender: m.user_id === 1 ? 'You' : 'Teammate',
+            text: m.message_text,
+            timestamp: new Date(m.sent_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+            isOwn: m.user_id === 1,
+          }))
+        )
+      })
+      .catch(() => {/* backend not reachable yet */})
   }, [])
 
   useEffect(() => {
@@ -88,24 +97,46 @@ export default function Chat() {
     }
   }, [closePrediction, isPredictionOpen])
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!input.trim()) return
 
-    const newMessage: Message = {
-      id: Date.now(),
-      sender: 'You',
-      text: input.trim(),
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: 'numeric',
-        minute: '2-digit',
-      }),
-      isOwn: true,
-    }
-
-    // This will later be replaced with a call to your backend/database
-    setMessages((prev) => [...prev, newMessage])
+    const text = input.trim()
     setInput('')
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: 1,
+          user_id: 1,
+          message_type: 'text',
+          message_text: text,
+        }),
+      })
+
+      if (!res.ok) {
+        console.error('Failed to send message:', await res.text())
+        return
+      }
+
+      const saved = await res.json()
+      const newMessage: Message = {
+        id: saved.message_id,
+        sender: 'You',
+        text: saved.message_text,
+        timestamp: new Date(saved.sent_at).toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+        isOwn: true,
+      }
+
+      setMessages((prev) => [...prev, newMessage])
+    } catch {
+      console.error('Network error sending message.')
+    }
   }
 
   const predictionErrors = (() => {
@@ -127,25 +158,70 @@ export default function Chat() {
 
   const canSubmitPrediction = predictionErrors.length === 0
 
-  const handleSubmitPrediction = (e: React.FormEvent) => {
+  const handleSubmitPrediction = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     setPredictionTouched(true)
     if (!canSubmitPrediction) return
 
-    const newPrediction: Prediction = {
-      sport: predictionDraft.sport,
-      category: predictionDraft.category,
+    const predictionDetails = {
       text: predictionDraft.text.trim(),
+      dueBy: predictionDraft.dueBy,
       minPoints: Number(predictionDraft.minPoints),
       maxPoints: Number(predictionDraft.maxPoints),
-      dueBy: predictionDraft.dueBy,
-      createdAt: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      createdBy: 'You',
     }
 
-    setCurrentPrediction(newPrediction)
-    closePrediction()
-    setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }))
+    const betPayload = {
+      chat_id: 1,
+      game_id: 1,
+      user_id: 1,
+      bet_category: `${predictionDraft.sport}:${predictionDraft.category}`,
+      prediction_details_json: JSON.stringify(predictionDetails),
+      points_wagered: Number(predictionDraft.minPoints),
+      status: 'pending',
+    }
+
+    try {
+      let res: Response
+      if (isEditingPrediction && currentBetId !== null) {
+        res = await fetch(`/api/bets/${currentBetId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...betPayload, bet_id: currentBetId }),
+        })
+      } else {
+        res = await fetch('/api/bets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(betPayload),
+        })
+      }
+
+      if (!res.ok) {
+        const msg = await res.text()
+        setSubmitError(msg || 'Failed to save bet.')
+        return
+      }
+
+      const saved: BetResponse = await res.json()
+      const [sport, category] = saved.bet_category.split(':') as [Sport, PredictionCategory]
+      const details = JSON.parse(saved.prediction_details_json)
+
+      setCurrentPrediction({
+        sport,
+        category,
+        text: details.text,
+        minPoints: details.minPoints,
+        maxPoints: details.maxPoints,
+        dueBy: details.dueBy,
+        createdAt: new Date(saved.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        createdBy: 'You',
+      })
+      setCurrentBetId(saved.bet_id)
+      closePrediction()
+      setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }))
+    } catch {
+      setSubmitError('Network error. Please try again.')
+    }
   }
 
   const formatDueBy = (dueBy: string) => {
@@ -154,8 +230,16 @@ export default function Chat() {
     return parsed.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
 
-  const handleDeletePrediction = () => {
+  const handleDeletePrediction = async () => {
+    if (currentBetId !== null) {
+      try {
+        await fetch(`/api/bets/${currentBetId}`, { method: 'DELETE' })
+      } catch {
+        // best-effort delete; clear locally regardless
+      }
+    }
     setCurrentPrediction(null)
+    setCurrentBetId(null)
   }
 
   const handleEditPrediction = () => {
@@ -490,6 +574,12 @@ export default function Chat() {
               {predictionTouched && predictionErrors.length > 0 && (
                 <div className="modal-error" role="alert">
                   {predictionErrors[0]}
+                </div>
+              )}
+
+              {submitError && (
+                <div className="modal-error" role="alert">
+                  {submitError}
                 </div>
               )}
 
