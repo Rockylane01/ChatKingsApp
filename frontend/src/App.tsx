@@ -2,9 +2,15 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import Chat from './Chat'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [page, setPage] = useState<'home' | 'chat'>('home')
+
+  if (page === 'chat') {
+    return <Chat />
+  }
 
   return (
     <>
@@ -21,6 +27,11 @@ function App() {
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>
+        <div style={{ marginTop: '1rem' }}>
+          <button type="button" onClick={() => setPage('chat')}>
+            Go to Team Chat
+          </button>
+        </div>
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
