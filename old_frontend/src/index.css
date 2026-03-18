@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ChatKings — Sportsbook Dark Theme */
+
+@layer base {
+  :root {
+    /* Dark sportsbook base — think FanDuel/DraftKings */
+    --background: 220 20% 7%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 18% 11%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 18% 11%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 153 80% 48%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 43 96% 56%;
+    --accent-foreground: 220 20% 7%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 16%;
+    --input: 220 15% 16%;
+    --ring: 153 80% 48%;
+
+    --radius: 0.75rem;
+
+    /* ChatKings custom tokens */
+    --ck-green: 153 80% 48%;
+    --ck-green-light: 153 60% 20%;
+    --ck-yellow: 45 93% 47%;
+    --ck-yellow-light: 45 60% 18%;
+    --ck-orange: 24 95% 53%;
+    --ck-orange-light: 24 60% 18%;
+    --ck-red: 0 84% 60%;
+    --ck-red-light: 0 60% 18%;
+    --ck-gold: 43 96% 56%;
+    --ck-navy: 220 25% 10%;
+    --ck-navy-light: 220 20% 16%;
+
+    /* Sportsbook-specific tokens */
+    --sb-surface: 220 18% 13%;
+    --sb-surface-hover: 220 18% 16%;
+    --sb-surface-active: 220 18% 19%;
+    --sb-bet-green: 153 80% 48%;
+    --sb-live-red: 0 84% 55%;
+    --sb-odds-bg: 220 15% 18%;
+    --sb-highlight: 153 80% 48%;
+
+    --sidebar-background: 220 20% 7%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 153 80% 48%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 220 15% 16%;
+    --sidebar-ring: 153 80% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  }
+
+  /* Hide scrollbar for horizontal scroll areas */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  /* Sportsbook card style */
+  .sb-card {
+    @apply rounded-xl border border-border bg-card;
+  }
+
+  /* Sportsbook odds button */
+  .sb-odds-btn {
+    @apply flex flex-col items-center justify-center rounded-lg px-4 py-2.5 font-semibold transition-all;
+    background: hsl(var(--sb-odds-bg));
+  }
+  .sb-odds-btn:hover {
+    background: hsl(var(--sb-surface-hover));
+  }
+  .sb-odds-btn.active {
+    background: hsl(var(--sb-bet-green));
+    color: hsl(var(--background));
+  }
+
+  /* Glowing accent for live indicators */
+  .sb-live-pulse {
+    @apply animate-pulse;
+    box-shadow: 0 0 8px hsl(var(--sb-live-red) / 0.6);
+  }
+
+  /* Gradient overlays */
+  .sb-gradient-card {
+    background: linear-gradient(135deg, hsl(220 18% 13%) 0%, hsl(220 18% 9%) 100%);
+  }
+
+  .sb-gradient-header {
+    background: linear-gradient(180deg, hsl(220 25% 10%) 0%, hsl(220 20% 7%) 100%);
+  }
+}
