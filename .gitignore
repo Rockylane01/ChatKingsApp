@@ -112,6 +112,11 @@ ipch/
 *.VC.db
 *.VC.VC.opendb
 
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
+
 # Visual Studio profiler
 *.psess
 *.vsp
@@ -364,3 +369,6 @@ FodyWeavers.xsd
 
 # Visual Studio Code
 .vscode/
+
+#Claude Settings
+.claude
