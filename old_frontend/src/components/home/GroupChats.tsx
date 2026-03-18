@@ -1,6 +1,8 @@
 import { chats, currentUser, getUserById } from "@/data/mock";
 import { useNavigate } from "react-router-dom";
 import { Crown, ChevronRight, Zap } from "lucide-react";
+import MakePredictionDialog from "@/components/predictions/MakePredictionDialog";
+import { Button } from "@/components/ui/button";
 
 const GroupChats = () => {
   const navigate = useNavigate();
@@ -69,6 +71,17 @@ const GroupChats = () => {
 
               {/* Points + Arrow */}
               <div className="flex flex-col items-end gap-1">
+                {!chat.activePrediction && (
+                  <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    <MakePredictionDialog
+                      trigger={
+                        <Button type="button" size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          Make prediction
+                        </Button>
+                      }
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5">
                   {myMembership && (
                     <div className="text-right">
