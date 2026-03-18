@@ -1,5 +1,3 @@
-
-
 User Requirements (EARS)
 Ubiquitous
 1. The ChatKings system shall allow users to participate in group chats with persistent
@@ -17,8 +15,28 @@ require the King to place a wager on that question.
 users with correct answers.
 7. When the King of the Chat is inactive beyond a configured time limit, the ChatKings
 system shall revoke the King role and adjust point totals accordingly.
+8. When a bet is ended and the king has not bet on it, the king shall automatically lose 10 points.
+
 State Driven
-8. While a user holds the King of the Chat role, the ChatKings system shall restrict question
-creation to that user.
-9. While a prediction question is active, the ChatKings system shall display the total points
+9. While a user holds the King of the Chat role, the ChatKings system shall identify them as King.
+10. While a prediction question is active, the ChatKings system shall display the total points
 wagered without revealing distribution by answer.
+
+
+Funtioning and Non-Functioning:
+Currently functioning:
+
+Messaging User Interface
+Betting User Interface
+
+Non-Functioning
+Messaging functionality
+Betting Functionality
+API calls to sports APIs
+Main Home page
+Friend Request ability
+
+
+
+
+
