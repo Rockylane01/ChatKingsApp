@@ -1,16 +1,16 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ChatKingsApp.Models;
 
 public class Message
 {
-    public int MessageId { get; set; }
-    public int ChatThreadId { get; set; }
-    public int SenderUserId { get; set; }
-    public string Text { get; set; } = null!;
-    public DateTime SentAt { get; set; }
-    public DateTime? ReadAt { get; set; }
-    public bool IsSystem { get; set; }
-
-    public ChatThread ChatThread { get; set; } = null!;
-    public User SenderUser { get; set; } = null!;
+    [Key]
+    public int message_id { get; set; }
+    public int chat_id { get; set; }
+    public int user_id { get; set; }
+    public string message_type { get; set; } = null!;
+    public string message_text { get; set; } = null!;
+    public int? related_bet_id { get; set; }
+    public DateTime sent_at { get; set; }
 }
 

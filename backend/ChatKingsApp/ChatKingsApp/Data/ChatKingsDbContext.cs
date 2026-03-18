@@ -11,17 +11,18 @@ public class ChatKingsDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
-    public DbSet<PublicProfile> PublicProfiles => Set<PublicProfile>();
+    public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
-    public DbSet<ChatThread> ChatThreads => Set<ChatThread>();
+    public DbSet<Chat> Chats => Set<Chat>();
+    public DbSet<ChatMember> ChatMembers => Set<ChatMember>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<Bet> Bets => Set<Bet>();
     public DbSet<Game> Games => Set<Game>();
-    public DbSet<OpenGame> OpenGames => Set<OpenGame>();
-    public DbSet<GameTurn> GameTurns => Set<GameTurn>();
     public DbSet<Team> Teams => Set<Team>();
-    public DbSet<GameStat> GameStats => Set<GameStat>();
     public DbSet<ChatTeam> ChatTeams => Set<ChatTeam>();
-    public DbSet<BotHistory> BotHistories => Set<BotHistory>();
+    public DbSet<GameStat> GameStats => Set<GameStat>();
+    public DbSet<DailyStrike> DailyStrikes => Set<DailyStrike>();
+    public DbSet<BetHistory> BetHistories => Set<BetHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,152 +31,79 @@ public class ChatKingsDbContext : DbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("USERS");
-            entity.HasKey(e => e.UserId);
+            entity.HasKey(e => e.user_id);
         });
 
-        modelBuilder.Entity<PublicProfile>(entity =>
+        modelBuilder.Entity<FriendRequest>(entity =>
         {
-            entity.ToTable("PUBLIC_PROFILES");
-            entity.HasKey(e => e.UserId);
-
-            entity.HasOne(e => e.User)
-                .WithOne(u => u.PublicProfile)
-                .HasForeignKey<PublicProfile>(e => e.UserId);
+            entity.ToTable("FRIEND_REQUESTS");
+            entity.HasKey(e => e.request_id);
         });
 
         modelBuilder.Entity<Friendship>(entity =>
         {
             entity.ToTable("FRIENDSHIPS");
-            entity.HasKey(e => new { e.RequestorUserId, e.AddresseeUserId });
-
-            entity.HasOne(e => e.RequestorUser)
-                .WithMany(u => u.FriendshipsRequested)
-                .HasForeignKey(e => e.RequestorUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.AddresseeUser)
-                .WithMany(u => u.FriendshipsReceived)
-                .HasForeignKey(e => e.AddresseeUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasKey(e => e.friendship_id);
         });
 
-        modelBuilder.Entity<ChatThread>(entity =>
+        modelBuilder.Entity<Chat>(entity =>
         {
-            entity.ToTable("CHAT_THREADS");
-            entity.HasKey(e => e.ChatThreadId);
+            entity.ToTable("CHATS");
+            entity.HasKey(e => e.chat_id);
+        });
 
-            entity.HasOne(e => e.Game)
-                .WithMany(g => g.ChatThreads)
-                .HasForeignKey(e => e.GameId);
+        modelBuilder.Entity<ChatMember>(entity =>
+        {
+            entity.ToTable("CHAT_MEMBERS");
+            entity.HasKey(e => e.member_id);
         });
 
         modelBuilder.Entity<Message>(entity =>
         {
             entity.ToTable("MESSAGES");
-            entity.HasKey(e => e.MessageId);
+            entity.HasKey(e => e.message_id);
+        });
 
-            entity.HasOne(e => e.ChatThread)
-                .WithMany(t => t.Messages)
-                .HasForeignKey(e => e.ChatThreadId);
-
-            entity.HasOne(e => e.SenderUser)
-                .WithMany(u => u.MessagesSent)
-                .HasForeignKey(e => e.SenderUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Bet>(entity =>
+        {
+            entity.ToTable("BETS");
+            entity.HasKey(e => e.bet_id);
         });
 
         modelBuilder.Entity<Game>(entity =>
         {
             entity.ToTable("GAMES");
-            entity.HasKey(e => e.GameId);
-
-            entity.HasOne(e => e.HostUser)
-                .WithMany(u => u.GamesHosted)
-                .HasForeignKey(e => e.HostUserId);
-        });
-
-        modelBuilder.Entity<OpenGame>(entity =>
-        {
-            entity.ToTable("OPEN");
-            entity.HasKey(e => e.OpenGameId);
-
-            entity.HasOne(e => e.Game)
-                .WithMany(g => g.OpenGames)
-                .HasForeignKey(e => e.GameId);
-
-            entity.HasOne(e => e.HostUser)
-                .WithMany()
-                .HasForeignKey(e => e.HostUserId);
-        });
-
-        modelBuilder.Entity<GameTurn>(entity =>
-        {
-            entity.ToTable("TURNS");
-            entity.HasKey(e => e.GameTurnId);
-
-            entity.HasOne(e => e.Game)
-                .WithMany(g => g.Turns)
-                .HasForeignKey(e => e.GameId);
-
-            entity.HasOne(e => e.ActingUser)
-                .WithMany(u => u.GameTurns)
-                .HasForeignKey(e => e.ActingUserId);
+            entity.HasKey(e => e.game_id);
         });
 
         modelBuilder.Entity<Team>(entity =>
         {
             entity.ToTable("TEAMS");
-            entity.HasKey(e => e.TeamId);
-
-            entity.HasOne(e => e.Game)
-                .WithMany(g => g.Teams)
-                .HasForeignKey(e => e.GameId);
-        });
-
-        modelBuilder.Entity<GameStat>(entity =>
-        {
-            entity.ToTable("GAME_STATS");
-            entity.HasKey(e => e.GameStatId);
-
-            entity.HasOne(e => e.Game)
-                .WithMany(g => g.GameStats)
-                .HasForeignKey(e => e.GameId);
-
-            entity.HasOne(e => e.Team)
-                .WithMany(t => t.GameStats)
-                .HasForeignKey(e => e.TeamId);
+            entity.HasKey(e => e.team_id);
         });
 
         modelBuilder.Entity<ChatTeam>(entity =>
         {
             entity.ToTable("CHAT_TEAMS");
-            entity.HasKey(e => new { e.ChatThreadId, e.TeamId });
-
-            entity.HasOne(e => e.ChatThread)
-                .WithMany(ct => ct.ChatTeams)
-                .HasForeignKey(e => e.ChatThreadId);
-
-            entity.HasOne(e => e.Team)
-                .WithMany(t => t.ChatTeams)
-                .HasForeignKey(e => e.TeamId);
+            entity.HasKey(e => e.chat_team_id);
         });
 
-        modelBuilder.Entity<BotHistory>(entity =>
+        modelBuilder.Entity<GameStat>(entity =>
         {
-            entity.ToTable("BOT_HISTORY");
-            entity.HasKey(e => e.BotHistoryId);
+            entity.ToTable("GAME_STATS");
+            entity.HasKey(e => e.stat_id);
+        });
 
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.BotHistories)
-                .HasForeignKey(e => e.UserId);
+        modelBuilder.Entity<DailyStrike>(entity =>
+        {
+            entity.ToTable("DAILY_STRIKES");
+            entity.HasKey(e => e.strike_id);
+        });
 
-            entity.HasOne(e => e.Game)
-                .WithMany()
-                .HasForeignKey(e => e.GameId);
-
-            entity.HasOne(e => e.GameTurn)
-                .WithMany()
-                .HasForeignKey(e => e.GameTurnId);
+        modelBuilder.Entity<BetHistory>(entity =>
+        {
+            entity.ToTable("BET_HISTORY");
+            entity.HasKey(e => e.history_id);
         });
     }
 }

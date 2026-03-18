@@ -1,11 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ChatKingsApp.Models;
 
 public class ChatTeam
 {
-    public int ChatThreadId { get; set; }
-    public int TeamId { get; set; }
-
-    public ChatThread ChatThread { get; set; } = null!;
-    public Team Team { get; set; } = null!;
+    [Key]
+    public int chat_team_id { get; set; }
+    public int chat_id { get; set; }
+    public int team_id { get; set; }
+    public DateTime added_at { get; set; }
 }
 
