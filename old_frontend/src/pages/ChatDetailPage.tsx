@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import StrikeBadge from "@/components/StrikeBadge";
 import { useToast } from "@/hooks/use-toast";
+import MakePredictionDialog from "@/components/predictions/MakePredictionDialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -269,6 +270,13 @@ const ChatDetailPage = () => {
         </div>
       )}
 
+      {/* Make Prediction (King) */}
+      {isKing && (
+        <div className="mx-3 mt-3">
+          <MakePredictionDialog />
+        </div>
+      )}
+
       {/* Active Prediction Card */}
       {prediction && (
         <div className="mx-3 mt-3 rounded-xl border border-primary/30 bg-card overflow-hidden">
@@ -331,19 +339,6 @@ const ChatDetailPage = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Make Prediction Button (King only) */}
-      {isKing && !prediction && (
-        <div className="mx-3 mt-3">
-          <Link
-            to={`/chat/${id}/create-prediction`}
-            className="flex items-center justify-center gap-2 rounded-xl border border-ck-gold/30 bg-ck-gold/10 py-3 text-sm font-bold text-ck-gold hover:bg-ck-gold/20 transition-colors"
-          >
-            <Crown className="h-4 w-4" />
-            Create Prediction
-          </Link>
         </div>
       )}
 

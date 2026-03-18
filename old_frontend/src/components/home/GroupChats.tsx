@@ -1,8 +1,10 @@
-import { chats, getUserById } from "@/data/mock";
-import { Link } from "react-router-dom";
+import { chats, currentUser, getUserById } from "@/data/mock";
+import { useNavigate } from "react-router-dom";
 import { Crown, ChevronRight, Zap } from "lucide-react";
 
 const GroupChats = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="px-4 pt-5">
       <h2 className="mb-3 font-heading text-base font-bold uppercase tracking-wide text-foreground">
@@ -12,17 +14,25 @@ const GroupChats = () => {
         {chats.map((chat) => {
           const king = chat.members.find((m) => m.isKing);
           const kingUser = king ? getUserById(king.userId) : null;
-          const myMembership = chat.members.find((m) => m.userId === "u1");
+          const myMembership = chat.members.find((m) => m.userId === currentUser.id);
           const totalPot = chat.activePrediction?.options.reduce(
             (sum, opt) => sum + opt.wagers.reduce((s, w) => s + w.amount, 0),
             0
           );
 
           return (
-            <Link
+            <div
               key={chat.id}
-              to={`/chat/${chat.id}`}
               className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-secondary/50 active:bg-secondary"
+              role="link"
+              tabIndex={0}
+              onClick={() => navigate(`/chat/${chat.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(`/chat/${chat.id}`);
+                }
+              }}
             >
               {/* Avatar */}
               <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-secondary font-heading font-bold text-base text-foreground">
@@ -58,16 +68,20 @@ const GroupChats = () => {
               </div>
 
               {/* Points + Arrow */}
-              <div className="flex items-center gap-1.5">
-                {myMembership && (
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-foreground tabular-nums">{myMembership.points.toLocaleString()}</div>
-                    <div className="text-[10px] text-muted-foreground">pts</div>
-                  </div>
-                )}
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  {myMembership && (
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-foreground tabular-nums">
+                        {myMembership.points.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">pts</div>
+                    </div>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>
