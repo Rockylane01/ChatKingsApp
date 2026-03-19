@@ -1,6 +1,7 @@
 /* Layout */
 
 #root {
+  width: 100%;
   min-height: 100vh;
   margin: 0;
   padding: 1.5rem;
@@ -708,6 +709,129 @@
   opacity: 0.5;
   cursor: default;
   box-shadow: none;
+}
+
+/* Home Page */
+
+.home-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  margin: -1.5rem;
+}
+
+.home-card {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.5rem 2rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: radial-gradient(circle at top left, #111827 0, #020617 62%);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(15, 23, 42, 0.8);
+  text-align: center;
+}
+
+.home-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 1.1rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #022c22;
+  letter-spacing: 0.05em;
+  box-shadow:
+    0 16px 40px rgba(16, 185, 129, 0.4),
+    0 0 0 1px rgba(6, 95, 70, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.home-subtitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: #9ca3af;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.home-btn {
+  width: 100%;
+  padding: 0.7rem !important;
+  font-size: 0.95rem !important;
+}
+
+/* Create User Page */
+
+.create-user-page {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.create-user-card {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.33);
+  background: radial-gradient(circle at top left, #111827 0, #020617 62%);
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(15, 23, 42, 0.8);
+  overflow: hidden;
+}
+
+.create-user-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.9);
+}
+
+.create-user-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.create-user-form {
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.create-user-success {
+  border-radius: 0.95rem;
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  background: rgba(6, 95, 70, 0.25);
+  color: rgba(167, 243, 208, 0.95);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 /* Responsive */
