@@ -84,12 +84,13 @@ export default function HomePage({
         <section className="score-ticker" aria-label="NCAA men's basketball scores">
           <div className="score-ticker-track">
             {[0, 1].flatMap((loop) =>
-              tickerGames.map((event, row) => {
-                const stableId = event.id != null && String(event.id).length > 0 ? String(event.id) : `row-${row}`
+              tickerGames.map((event) => {
+                const stableId =
+                  event.id != null && String(event.id).length > 0 ? String(event.id) : `fallback-${event.matchup}`
                 return (
                   <article
                     className="score-ticker-item"
-                    key={`score-ticker-${loop}-${row}-${stableId}`}
+                    key={`score-ticker-${loop}-${stableId}`}
                   >
                     <span className="score-league">{event.league}</span>
                     <span className="score-matchup">{event.matchup}</span>
