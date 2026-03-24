@@ -53,6 +53,7 @@ function App() {
           setSelectedChatId(chatId)
           setPage('chat')
         }}
+        onGoHome={() => setPage('dashboard')}
         onLogout={handleLogout}
       />
     )

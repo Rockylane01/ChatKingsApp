@@ -15,6 +15,33 @@ const liveEvents = [
   { league: 'NCAAF', matchup: 'Texas vs Alabama', score: '17 - 20', status: 'Q2 0:42' },
 ]
 
+const currentBets = [
+  {
+    id: 1,
+    friend: 'Mason',
+    matchup: 'Lakers vs Warriors',
+    pick: 'Lakers -4.5',
+    points: 25,
+    status: 'Pending',
+  },
+  {
+    id: 2,
+    friend: 'Ava',
+    matchup: 'Chiefs vs Bills',
+    pick: 'Over 48.5',
+    points: 15,
+    status: 'Winning',
+  },
+  {
+    id: 3,
+    friend: 'Jordan',
+    matchup: 'Yankees vs Red Sox',
+    pick: 'Red Sox ML',
+    points: 20,
+    status: 'Pending',
+  },
+]
+
 export default function HomePage({
   currentUser,
   onOpenChats,
@@ -60,6 +87,29 @@ export default function HomePage({
           <p className="home-subtitle">
             Pick your games, drop predictions, and compete with your friends using points only.
           </p>
+
+          <section className="current-bets" aria-label="Current bets with friends">
+            <div className="current-bets-header">
+              <h2>Current Bets With Friends</h2>
+              <span className="current-bets-count">{currentBets.length} active</span>
+            </div>
+            <div className="current-bets-list">
+              {currentBets.map((bet) => (
+                <article className="current-bet-card" key={bet.id}>
+                  <div className="current-bet-top">
+                    <span className="current-bet-friend">vs {bet.friend}</span>
+                    <span className={`current-bet-status ${bet.status.toLowerCase()}`}>
+                      {bet.status}
+                    </span>
+                  </div>
+                  <p className="current-bet-matchup">{bet.matchup}</p>
+                  <p className="current-bet-pick">{bet.pick}</p>
+                  <p className="current-bet-points">{bet.points} pts at stake</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <div className="home-actions">
             <button type="button" className="modal-primary-button home-btn" onClick={onOpenChats}>
               Open Team Chats

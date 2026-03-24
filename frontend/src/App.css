@@ -865,6 +865,105 @@
   text-align: center;
 }
 
+.current-bets {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.5);
+  text-align: left;
+}
+
+.current-bets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.current-bets-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.current-bets-count {
+  font-size: 0.74rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+  background: rgba(6, 95, 70, 0.35);
+}
+
+.current-bets-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.current-bet-card {
+  border-radius: 0.85rem;
+  border: 1px solid rgba(55, 65, 81, 0.8);
+  background: radial-gradient(circle at top left, #0f172a 0, #020617 60%);
+  padding: 0.65rem;
+}
+
+.current-bet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.current-bet-friend {
+  font-size: 0.76rem;
+  color: #cbd5e1;
+}
+
+.current-bet-status {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.16rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #e5e7eb;
+}
+
+.current-bet-status.winning {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #a7f3d0;
+}
+
+.current-bet-status.pending {
+  border-color: rgba(250, 204, 21, 0.55);
+  color: #fde68a;
+}
+
+.current-bet-matchup {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: #d1d5db;
+}
+
+.current-bet-pick {
+  margin: 0.18rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f9fafb;
+}
+
+.current-bet-points {
+  margin: 0.22rem 0 0;
+  font-size: 0.74rem;
+  color: #86efac;
+}
+
 @keyframes ticker-scroll {
   from {
     transform: translateX(0);
@@ -1071,6 +1170,10 @@
   }
 
   .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .current-bets-list {
     grid-template-columns: 1fr;
   }
 }

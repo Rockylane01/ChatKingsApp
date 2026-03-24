@@ -4,10 +4,11 @@ import type { User, Chat } from './types'
 interface ChatListProps {
   currentUser: User
   onSelectChat: (chatId: number) => void
+  onGoHome: () => void
   onLogout: () => void
 }
 
-export default function ChatList({ currentUser, onSelectChat, onLogout }: ChatListProps) {
+export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout }: ChatListProps) {
   const [myChats, setMyChats] = useState<Chat[]>([])
   const [allChats, setAllChats] = useState<Chat[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,6 +109,9 @@ export default function ChatList({ currentUser, onSelectChat, onLogout }: ChatLi
           <span style={{ fontSize: '0.8rem', color: '#9ca3af', marginRight: '0.5rem' }}>
             {currentUser.username}
           </span>
+          <button type="button" className="nav-link-button" onClick={onGoHome}>
+            Home
+          </button>
           <button type="button" className="nav-link-button" onClick={onLogout}>
             Sign Out
           </button>
