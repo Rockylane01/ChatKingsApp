@@ -62,8 +62,10 @@ export default function Chat() {
     setSubmitError(null)
   }, [])
 
+  const chatId = 1
+
   useEffect(() => {
-    fetch('/api/messages?chatId=1')
+    fetch(`/api/messages?chatId=${chatId}`)
       .then((res) => res.json())
       .then((data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }>) => {
         setMessages(
@@ -75,6 +77,34 @@ export default function Chat() {
             isOwn: m.user_id === 1,
           }))
         )
+      })
+      .catch(() => {/* backend not reachable yet */})
+  }, [])
+
+  useEffect(() => {
+    fetch(`/api/bets?chatId=${chatId}`)
+      .then((res) => res.json())
+      .then((bets: BetResponse[]) => {
+        const pending = bets.find((b) => b.status === 'pending')
+        if (!pending) return
+        const [sport, category] = pending.bet_category.split(':') as [Sport, PredictionCategory]
+        const details = JSON.parse(pending.prediction_details_json) as {
+          text: string
+          dueBy: string
+          minPoints: number
+          maxPoints: number
+        }
+        setCurrentPrediction({
+          sport,
+          category,
+          text: details.text,
+          minPoints: details.minPoints,
+          maxPoints: details.maxPoints,
+          dueBy: details.dueBy,
+          createdAt: new Date(pending.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          createdBy: 'You',
+        })
+        setCurrentBetId(pending.bet_id)
       })
       .catch(() => {/* backend not reachable yet */})
   }, [])
@@ -171,7 +201,7 @@ export default function Chat() {
     }
 
     const betPayload = {
-      chat_id: 1,
+      chat_id: chatId,
       game_id: 1,
       user_id: 1,
       bet_category: `${predictionDraft.sport}:${predictionDraft.category}`,

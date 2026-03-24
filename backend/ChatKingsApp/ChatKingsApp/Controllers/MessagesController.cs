@@ -20,53 +20,92 @@ public class MessagesController : ControllerBase
 
     // POST api/messages
     [HttpPost]
-    public async Task<ActionResult<Message>> SendMessage([FromBody] Message message)
+    public async Task<ActionResult<object>> SendMessage([FromBody] CreateMessageRequest req)
     {
-        if (!ValidMessageTypes.Contains(message.message_type))
-            return BadRequest($"Invalid message_type '{message.message_type}'. Must be one of: {string.Join(", ", ValidMessageTypes)}.");
+        if (!ValidMessageTypes.Contains(req.message_type))
+            return BadRequest($"Invalid message_type '{req.message_type}'. Must be one of: {string.Join(", ", ValidMessageTypes)}.");
 
-        if (string.IsNullOrWhiteSpace(message.message_text))
+        if (string.IsNullOrWhiteSpace(req.message_text))
             return BadRequest("message_text is required.");
 
-        message.message_id = 0;
-        message.sent_at = DateTime.UtcNow;
+        var message = new ChatMessage
+        {
+            chat_id = req.chat_id,
+            sender_user_id = req.user_id,
+            message_type = req.message_type,
+            message_text = req.message_text,
+            prediction_id = req.prediction_id,
+            created_at = DateTime.UtcNow,
+        };
 
-        _context.Messages.Add(message);
+        _context.ChatMessages.Add(message);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetMessage), new { id = message.message_id }, message);
+        var dto = new
+        {
+            message.message_id,
+            message.chat_id,
+            user_id = message.sender_user_id,
+            message.message_type,
+            message.message_text,
+            message.prediction_id,
+            sent_at = message.created_at,
+        };
+        return CreatedAtAction(nameof(GetMessage), new { id = message.message_id }, dto);
     }
 
     // GET api/messages?chatId={id}
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Message>>> GetMessages([FromQuery] int? chatId)
+    public async Task<ActionResult<IEnumerable<object>>> GetMessages([FromQuery] int? chatId)
     {
-        var query = _context.Messages.AsQueryable();
+        var query = _context.ChatMessages.AsQueryable();
 
         if (chatId.HasValue)
             query = query.Where(m => m.chat_id == chatId.Value);
 
-        var messages = await query.OrderBy(m => m.sent_at).ToListAsync();
-        return Ok(messages);
+        var messages = await query.OrderBy(m => m.created_at).ToListAsync();
+        // Map to frontend shape: user_id, sent_at
+        var dtos = messages.Select(m => new
+        {
+            m.message_id,
+            m.chat_id,
+            user_id = m.sender_user_id,
+            m.message_type,
+            m.message_text,
+            m.prediction_id,
+            sent_at = m.created_at,
+        });
+        return Ok(dtos);
     }
 
     // GET api/messages/{id}
     [HttpGet("{id}")]
-    public async Task<ActionResult<Message>> GetMessage(int id)
+    public async Task<ActionResult<object>> GetMessage(int id)
     {
-        var message = await _context.Messages.FindAsync(id);
-        return message is null ? NotFound() : Ok(message);
+        var message = await _context.ChatMessages.FindAsync(id);
+        if (message is null)
+            return NotFound();
+        return Ok(new
+        {
+            message.message_id,
+            message.chat_id,
+            user_id = message.sender_user_id,
+            message.message_type,
+            message.message_text,
+            message.prediction_id,
+            sent_at = message.created_at,
+        });
     }
 
     // DELETE api/messages/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteMessage(int id)
     {
-        var message = await _context.Messages.FindAsync(id);
+        var message = await _context.ChatMessages.FindAsync(id);
         if (message is null)
             return NotFound();
 
-        _context.Messages.Remove(message);
+        _context.ChatMessages.Remove(message);
         await _context.SaveChangesAsync();
 
         return NoContent();

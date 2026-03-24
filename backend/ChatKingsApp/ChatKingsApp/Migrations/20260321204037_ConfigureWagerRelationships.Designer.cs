@@ -3,6 +3,7 @@ using System;
 using ChatKingsApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ChatKingsApp.Migrations
 {
     [DbContext(typeof(ChatKingsDbContext))]
-    partial class ChatKingsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321204037_ConfigureWagerRelationships")]
+    partial class ConfigureWagerRelationships
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -229,9 +232,6 @@ namespace ChatKingsApp.Migrations
                     b.Property<int>("home_team_id")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("season")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("status")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -253,43 +253,22 @@ namespace ChatKingsApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("assists")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("blocks")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("field_goals_attempted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("field_goals_made")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("fouls")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("free_throws_attempted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("free_throws_made")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("game_id")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("rebounds")
+                    b.Property<int?>("passing_yards")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("steals")
+                    b.Property<int?>("rushing_yards")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("team_id")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("three_pointers_attempted")
+                    b.Property<int?>("time_of_possession_seconds")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("three_pointers_made")
+                    b.Property<int?>("total_yards")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("turnovers")
@@ -466,9 +445,6 @@ namespace ChatKingsApp.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("conference")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("division")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("league")
