@@ -31,7 +31,7 @@ export default function CreateUser({ onBack }: CreateUserProps) {
           phone_number: phoneNumber || null,
           add_code: addCode,
           profile_image_url: profileImageUrl || null,
-          all_time_points: 0,
+          lifetime_points: 0,
         }),
       })
 

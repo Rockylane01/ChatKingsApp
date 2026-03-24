@@ -97,6 +97,9 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
 
   // Initial message fetch
   useEffect(() => {
+  const chatId = 1
+
+  useEffect(() => {
     fetch(`/api/messages?chatId=${chatId}`)
       .then((res) => res.json())
       .then((data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }>) => {
@@ -144,6 +147,34 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    fetch(`/api/bets?chatId=${chatId}`)
+      .then((res) => res.json())
+      .then((bets: BetResponse[]) => {
+        const pending = bets.find((b) => b.status === 'pending')
+        if (!pending) return
+        const [sport, category] = pending.bet_category.split(':') as [Sport, PredictionCategory]
+        const details = JSON.parse(pending.prediction_details_json) as {
+          text: string
+          dueBy: string
+          minPoints: number
+          maxPoints: number
+        }
+        setCurrentPrediction({
+          sport,
+          category,
+          text: details.text,
+          minPoints: details.minPoints,
+          maxPoints: details.maxPoints,
+          dueBy: details.dueBy,
+          createdAt: new Date(pending.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          createdBy: 'You',
+        })
+        setCurrentBetId(pending.bet_id)
+      })
+      .catch(() => {/* backend not reachable yet */})
+  }, [])
 
   useEffect(() => {
     if (!isPredictionOpen) return

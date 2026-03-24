@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import type { User } from './types'
 
+interface User {
+  user_id: number
+  username: string
+  email: string
+  phone_number: string | null
+  add_code: string
+  profile_image_url: string | null
+  lifetime_points: number
+}
+
 interface LoginProps {
   onLogin: (user: User) => void
   onBack: () => void

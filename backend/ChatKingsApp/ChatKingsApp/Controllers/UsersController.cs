@@ -52,7 +52,7 @@ public class UsersController : ControllerBase
         existing.phone_number = user.phone_number;
         existing.add_code = user.add_code;
         existing.profile_image_url = user.profile_image_url;
-        existing.all_time_points = user.all_time_points;
+        existing.lifetime_points = user.lifetime_points;
         existing.updated_at = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

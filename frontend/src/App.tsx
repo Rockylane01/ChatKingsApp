@@ -6,6 +6,16 @@ import CreateUser from './CreateUser'
 import Login from './Login'
 import type { User } from './types'
 
+interface User {
+  user_id: number
+  username: string
+  email: string
+  phone_number: string | null
+  add_code: string
+  profile_image_url: string | null
+  lifetime_points: number
+}
+
 function App() {
   const [page, setPage] = useState<'home' | 'chat' | 'chat-list' | 'create-user' | 'login'>('home')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
