@@ -54,7 +54,9 @@ export default function ChatList({ currentUser, onSelectChat, onLogout }: ChatLi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_name: newChatName.trim(),
-          admin_id: currentUser.user_id,
+          chat_type: 'group',
+          created_by_user_id: currentUser.user_id,
+          status: 'active',
         }),
       })
 
