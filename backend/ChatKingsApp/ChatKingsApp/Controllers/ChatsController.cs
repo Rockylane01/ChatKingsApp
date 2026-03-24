@@ -48,15 +48,12 @@ public class ChatsController : ControllerBase
         if (string.IsNullOrWhiteSpace(chat.chat_name))
             return BadRequest("chat_name is required.");
 
-        if (chat.admin_id <= 0)
-            return BadRequest("admin_id is required.");
+        if (chat.created_by_user_id <= 0)
+            return BadRequest("created_by_user_id is required.");
 
         chat.chat_id = 0;
         chat.created_at = DateTime.UtcNow;
         chat.updated_at = DateTime.UtcNow;
-
-        if (string.IsNullOrWhiteSpace(chat.bet_permission))
-            chat.bet_permission = "all";
 
         _context.Chats.Add(chat);
         await _context.SaveChangesAsync();
@@ -65,9 +62,11 @@ public class ChatsController : ControllerBase
         var member = new ChatMember
         {
             chat_id = chat.chat_id,
-            user_id = chat.admin_id,
-            points = 0,
+            user_id = chat.created_by_user_id,
+            role = "admin",
+            points_balance = 0,
             joined_at = DateTime.UtcNow,
+            is_active = true,
         };
 
         _context.ChatMembers.Add(member);
@@ -94,8 +93,10 @@ public class ChatsController : ControllerBase
         {
             chat_id = chatId,
             user_id = userId,
-            points = 0,
+            role = "member",
+            points_balance = 0,
             joined_at = DateTime.UtcNow,
+            is_active = true,
         };
 
         _context.ChatMembers.Add(member);
@@ -118,7 +119,7 @@ public class ChatsController : ControllerBase
                 {
                     cm.user_id,
                     u.username,
-                    cm.points,
+                    cm.points_balance,
                     cm.joined_at,
                 })
             .ToListAsync();
