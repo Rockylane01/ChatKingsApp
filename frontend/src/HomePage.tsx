@@ -83,14 +83,22 @@ export default function HomePage({
       {tickerGames.length > 0 ? (
         <section className="score-ticker" aria-label="NCAA men's basketball scores">
           <div className="score-ticker-track">
-            {[...tickerGames, ...tickerGames].map((event, idx) => (
-              <article className="score-ticker-item" key={`${event.id}-${idx}`}>
-                <span className="score-league">{event.league}</span>
-                <span className="score-matchup">{event.matchup}</span>
-                <span className="score-line">{event.score}</span>
-                <span className="score-status">{event.status}</span>
-              </article>
-            ))}
+            {[0, 1].flatMap((loop) =>
+              tickerGames.map((event, row) => {
+                const stableId = event.id != null && String(event.id).length > 0 ? String(event.id) : `row-${row}`
+                return (
+                  <article
+                    className="score-ticker-item"
+                    key={`score-ticker-${loop}-${row}-${stableId}`}
+                  >
+                    <span className="score-league">{event.league}</span>
+                    <span className="score-matchup">{event.matchup}</span>
+                    <span className="score-line">{event.score}</span>
+                    <span className="score-status">{event.status}</span>
+                  </article>
+                )
+              }),
+            )}
           </div>
         </section>
       ) : null}
