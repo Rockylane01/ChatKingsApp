@@ -1,57 +1,61 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import './App.css'
-import type { User } from './types'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import './App.css';
+import type { User } from './types';
 
 type Message = {
-  id: number
-  sender: string
-  text: string
-  timestamp: string
-  isOwn: boolean
-}
+  id: number;
+  sender: string;
+  text: string;
+  timestamp: string;
+  isOwn: boolean;
+};
 
-type Sport = 'Basketball' | 'Football'
-type PredictionCategory = 'Points' | 'Stats'
+type Sport = 'Basketball' | 'Football';
+type PredictionCategory = 'Points' | 'Stats';
 
 type Prediction = {
-  sport: Sport
-  category: PredictionCategory
-  text: string
-  minPoints: number
-  maxPoints: number
-  dueBy: string
-  createdAt: string
-  createdBy: string
-}
+  sport: Sport;
+  category: PredictionCategory;
+  text: string;
+  minPoints: number;
+  maxPoints: number;
+  dueBy: string;
+  createdAt: string;
+  createdBy: string;
+};
 
 type BetResponse = {
-  bet_id: number
-  chat_id: number
-  game_id: number
-  user_id: number
-  bet_category: string
-  prediction_details_json: string
-  points_wagered: number
-  status: string
-  placed_at: string
-  resolved_at: string | null
-}
+  bet_id: number;
+  chat_id: number;
+  game_id: number;
+  user_id: number;
+  bet_category: string;
+  prediction_details_json: string;
+  points_wagered: number;
+  status: string;
+  placed_at: string;
+  resolved_at: string | null;
+};
 
 interface ChatProps {
-  currentUser: User
-  chatId: number
-  onBack: () => void
+  currentUser: User;
+  chatId: number;
+  onBack: () => void;
 }
 
 export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isPredictionOpen, setIsPredictionOpen] = useState(false)
-  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(null)
-  const [currentBetId, setCurrentBetId] = useState<number | null>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [isEditingPrediction, setIsEditingPrediction] = useState(false)
-  const [memberNames, setMemberNames] = useState<Map<number, string>>(new Map())
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isPredictionOpen, setIsPredictionOpen] = useState(false);
+  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(
+    null
+  );
+  const [currentBetId, setCurrentBetId] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isEditingPrediction, setIsEditingPrediction] = useState(false);
+  const [memberNames, setMemberNames] = useState<Map<number, string>>(
+    new Map()
+  );
   const [predictionDraft, setPredictionDraft] = useState({
     sport: 'Basketball' as Sport,
     category: 'Points' as PredictionCategory,
@@ -59,57 +63,76 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     minPoints: 10,
     maxPoints: 100,
     dueBy: '',
-  })
-  const [predictionTouched, setPredictionTouched] = useState(false)
-  const predictionSportRef = useRef<HTMLSelectElement | null>(null)
-  const lastMessageIdRef = useRef<number>(0)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  });
+  const [predictionTouched, setPredictionTouched] = useState(false);
+  const predictionSportRef = useRef<HTMLSelectElement | null>(null);
+  const lastMessageIdRef = useRef<number>(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const closePrediction = useCallback(() => {
-    setIsPredictionOpen(false)
-    setPredictionTouched(false)
-    setIsEditingPrediction(false)
-    setSubmitError(null)
-  }, [])
+    setIsPredictionOpen(false);
+    setPredictionTouched(false);
+    setIsEditingPrediction(false);
+    setSubmitError(null);
+  }, []);
 
   // Fetch members for name resolution
   useEffect(() => {
     fetch(`/api/chats/${chatId}/members`)
       .then((res) => res.json())
       .then((data: Array<{ user_id: number; username: string }>) => {
-        const map = new Map<number, string>()
-        data.forEach((m) => map.set(m.user_id, m.username))
-        setMemberNames(map)
+        const map = new Map<number, string>();
+        data.forEach((m) => map.set(m.user_id, m.username));
+        setMemberNames(map);
       })
-      .catch(() => {})
-  }, [chatId])
+      .catch(() => {});
+  }, [chatId]);
 
   const resolveMessage = useCallback(
-    (m: { message_id: number; user_id: number; message_text: string; sent_at: string }) => ({
+    (m: {
+      message_id: number;
+      user_id: number;
+      message_text: string;
+      sent_at: string;
+    }) => ({
       id: m.message_id,
-      sender: m.user_id === currentUser.user_id ? 'You' : (memberNames.get(m.user_id) ?? 'Unknown'),
+      sender:
+        m.user_id === currentUser.user_id
+          ? 'You'
+          : (memberNames.get(m.user_id) ?? 'Unknown'),
       text: m.message_text,
-      timestamp: new Date(m.sent_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      timestamp: new Date(m.sent_at).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
       isOwn: m.user_id === currentUser.user_id,
     }),
     [currentUser.user_id, memberNames]
-  )
+  );
 
   // Initial message fetch
   useEffect(() => {
-  const chatId = 1
-
-  useEffect(() => {
     fetch(`/api/messages?chatId=${chatId}`)
       .then((res) => res.json())
-      .then((data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }>) => {
-        setMessages(data.map(resolveMessage))
-        if (data.length > 0) {
-          lastMessageIdRef.current = Math.max(...data.map((m) => m.message_id))
+      .then(
+        (
+          data: Array<{
+            message_id: number;
+            user_id: number;
+            message_text: string;
+            sent_at: string;
+          }>
+        ) => {
+          setMessages(data.map(resolveMessage));
+          if (data.length > 0) {
+            lastMessageIdRef.current = Math.max(
+              ...data.map((m) => m.message_id)
+            );
+          }
         }
-      })
-      .catch(() => {})
-  }, [chatId, resolveMessage])
+      )
+      .catch(() => {});
+  }, [chatId, resolveMessage]);
 
   // Polling for new messages every 3 seconds
   useEffect(() => {
@@ -117,50 +140,57 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       try {
         const res = await fetch(
           `/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`
-        )
-        if (!res.ok) return
-        const data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }> =
-          await res.json()
-        if (data.length === 0) return
+        );
+        if (!res.ok) return;
+        const data: Array<{
+          message_id: number;
+          user_id: number;
+          message_text: string;
+          sent_at: string;
+        }> = await res.json();
+        if (data.length === 0) return;
 
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id))
+          const existingIds = new Set(prev.map((m) => m.id));
           const newMsgs = data
             .filter((m) => !existingIds.has(m.message_id))
-            .map(resolveMessage)
-          return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
-        })
+            .map(resolveMessage);
+          return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
+        });
 
         lastMessageIdRef.current = Math.max(
           lastMessageIdRef.current,
           ...data.map((m) => m.message_id)
-        )
+        );
       } catch {
         // swallow network errors during polling
       }
-    }, 3000)
+    }, 3000);
 
-    return () => clearInterval(interval)
-  }, [chatId, resolveMessage])
+    return () => clearInterval(interval);
+  }, [chatId, resolveMessage]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   useEffect(() => {
     fetch(`/api/bets?chatId=${chatId}`)
       .then((res) => res.json())
       .then((bets: BetResponse[]) => {
-        const pending = bets.find((b) => b.status === 'pending')
-        if (!pending) return
-        const [sport, category] = pending.bet_category.split(':') as [Sport, PredictionCategory]
+        const pending = bets.find((b) => b.status === 'pending');
+        if (!pending) return;
+        const [sport, category] = pending.bet_category.split(':') as [
+          Sport,
+          PredictionCategory,
+        ];
         const details = JSON.parse(pending.prediction_details_json) as {
-          text: string
-          dueBy: string
-          minPoints: number
-          maxPoints: number
-        }
+          text: string;
+          dueBy: string;
+          minPoints: number;
+          maxPoints: number;
+        };
         setCurrentPrediction({
           sport,
           category,
@@ -168,38 +198,43 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           minPoints: details.minPoints,
           maxPoints: details.maxPoints,
           dueBy: details.dueBy,
-          createdAt: new Date(pending.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          createdAt: new Date(pending.placed_at).toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+          }),
           createdBy: 'You',
-        })
-        setCurrentBetId(pending.bet_id)
+        });
+        setCurrentBetId(pending.bet_id);
       })
-      .catch(() => {/* backend not reachable yet */})
-  }, [])
+      .catch(() => {
+        /* backend not reachable yet */
+      });
+  }, []);
 
   useEffect(() => {
-    if (!isPredictionOpen) return
+    if (!isPredictionOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closePrediction()
-    }
+      if (e.key === 'Escape') closePrediction();
+    };
 
-    const previousOverflow = document.body.style.overflow
-    document.addEventListener('keydown', handleKeyDown)
-    document.body.style.overflow = 'hidden'
-    predictionSportRef.current?.focus()
+    const previousOverflow = document.body.style.overflow;
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    predictionSportRef.current?.focus();
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = previousOverflow
-    }
-  }, [closePrediction, isPredictionOpen])
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [closePrediction, isPredictionOpen]);
 
   const handleSend = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!input.trim()) return
+    e.preventDefault();
+    if (!input.trim()) return;
 
-    const text = input.trim()
-    setInput('')
+    const text = input.trim();
+    setInput('');
 
     try {
       const res = await fetch('/api/messages', {
@@ -211,14 +246,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           message_type: 'text',
           message_text: text,
         }),
-      })
+      });
 
       if (!res.ok) {
-        console.error('Failed to send message:', await res.text())
-        return
+        console.error('Failed to send message:', await res.text());
+        return;
       }
 
-      const saved = await res.json()
+      const saved = await res.json();
       const newMessage: Message = {
         id: saved.message_id,
         sender: 'You',
@@ -228,45 +263,53 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           minute: '2-digit',
         }),
         isOwn: true,
-      }
+      };
 
-      setMessages((prev) => [...prev, newMessage])
-      lastMessageIdRef.current = Math.max(lastMessageIdRef.current, saved.message_id)
+      setMessages((prev) => [...prev, newMessage]);
+      lastMessageIdRef.current = Math.max(
+        lastMessageIdRef.current,
+        saved.message_id
+      );
     } catch {
-      console.error('Network error sending message.')
+      console.error('Network error sending message.');
     }
-  }
+  };
 
   const predictionErrors = (() => {
-    const errors: string[] = []
-    if (!predictionDraft.text.trim()) errors.push('Enter a prediction.')
-    if (!predictionDraft.dueBy) errors.push('Add a bet due-by time.')
+    const errors: string[] = [];
+    if (!predictionDraft.text.trim()) errors.push('Enter a prediction.');
+    if (!predictionDraft.dueBy) errors.push('Add a bet due-by time.');
 
-    const min = Number(predictionDraft.minPoints)
-    const max = Number(predictionDraft.maxPoints)
+    const min = Number(predictionDraft.minPoints);
+    const max = Number(predictionDraft.maxPoints);
 
-    if (!Number.isFinite(min) || !Number.isFinite(max)) errors.push('Enter valid point values.')
-    if (min < 0 || max < 0) errors.push('Points must be 0 or more.')
+    if (!Number.isFinite(min) || !Number.isFinite(max))
+      errors.push('Enter valid point values.');
+    if (min < 0 || max < 0) errors.push('Points must be 0 or more.');
     if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
-      errors.push('Minimum points must be less than or equal to maximum points.')
+      errors.push(
+        'Minimum points must be less than or equal to maximum points.'
+      );
     }
 
-    return errors
-  })()
+    return errors;
+  })();
 
-  const canSubmitPrediction = predictionErrors.length === 0
+  const canSubmitPrediction = predictionErrors.length === 0;
 
-  const handleSubmitPrediction = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setPredictionTouched(true)
-    if (!canSubmitPrediction) return
+  const handleSubmitPrediction = async (
+    e: React.SyntheticEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    setPredictionTouched(true);
+    if (!canSubmitPrediction) return;
 
     const predictionDetails = {
       text: predictionDraft.text.trim(),
       dueBy: predictionDraft.dueBy,
       minPoints: Number(predictionDraft.minPoints),
       maxPoints: Number(predictionDraft.maxPoints),
-    }
+    };
 
     const betPayload = {
       chat_id: chatId,
@@ -276,33 +319,36 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       prediction_details_json: JSON.stringify(predictionDetails),
       points_wagered: Number(predictionDraft.minPoints),
       status: 'pending',
-    }
+    };
 
     try {
-      let res: Response
+      let res: Response;
       if (isEditingPrediction && currentBetId !== null) {
         res = await fetch(`/api/bets/${currentBetId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...betPayload, bet_id: currentBetId }),
-        })
+        });
       } else {
         res = await fetch('/api/bets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(betPayload),
-        })
+        });
       }
 
       if (!res.ok) {
-        const msg = await res.text()
-        setSubmitError(msg || 'Failed to save bet.')
-        return
+        const msg = await res.text();
+        setSubmitError(msg || 'Failed to save bet.');
+        return;
       }
 
-      const saved: BetResponse = await res.json()
-      const [sport, category] = saved.bet_category.split(':') as [Sport, PredictionCategory]
-      const details = JSON.parse(saved.prediction_details_json)
+      const saved: BetResponse = await res.json();
+      const [sport, category] = saved.bet_category.split(':') as [
+        Sport,
+        PredictionCategory,
+      ];
+      const details = JSON.parse(saved.prediction_details_json);
 
       setCurrentPrediction({
         sport,
@@ -311,37 +357,48 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         minPoints: details.minPoints,
         maxPoints: details.maxPoints,
         dueBy: details.dueBy,
-        createdAt: new Date(saved.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        createdBy: saved.user_id === currentUser.user_id ? 'You' : (memberNames.get(saved.user_id) ?? 'Unknown'),
-      })
-      setCurrentBetId(saved.bet_id)
-      closePrediction()
-      setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }))
+        createdAt: new Date(saved.placed_at).toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+        createdBy:
+          saved.user_id === currentUser.user_id
+            ? 'You'
+            : (memberNames.get(saved.user_id) ?? 'Unknown'),
+      });
+      setCurrentBetId(saved.bet_id);
+      closePrediction();
+      setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }));
     } catch {
-      setSubmitError('Network error. Please try again.')
+      setSubmitError('Network error. Please try again.');
     }
-  }
+  };
 
   const formatDueBy = (dueBy: string) => {
-    const parsed = new Date(dueBy)
-    if (!Number.isFinite(parsed.getTime())) return dueBy
-    return parsed.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-  }
+    const parsed = new Date(dueBy);
+    if (!Number.isFinite(parsed.getTime())) return dueBy;
+    return parsed.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
 
   const handleDeletePrediction = async () => {
     if (currentBetId !== null) {
       try {
-        await fetch(`/api/bets/${currentBetId}`, { method: 'DELETE' })
+        await fetch(`/api/bets/${currentBetId}`, { method: 'DELETE' });
       } catch {
         // best-effort delete; clear locally regardless
       }
     }
-    setCurrentPrediction(null)
-    setCurrentBetId(null)
-  }
+    setCurrentPrediction(null);
+    setCurrentBetId(null);
+  };
 
   const handleEditPrediction = () => {
-    if (!currentPrediction) return
+    if (!currentPrediction) return;
     setPredictionDraft({
       sport: currentPrediction.sport,
       category: currentPrediction.category,
@@ -349,11 +406,11 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       minPoints: currentPrediction.minPoints,
       maxPoints: currentPrediction.maxPoints,
       dueBy: currentPrediction.dueBy,
-    })
-    setPredictionTouched(false)
-    setIsEditingPrediction(true)
-    setIsPredictionOpen(true)
-  }
+    });
+    setPredictionTouched(false);
+    setIsEditingPrediction(true);
+    setIsPredictionOpen(true);
+  };
 
   return (
     <div className="chat-page">
@@ -362,15 +419,26 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           <span className="brand-mark">ChatKings</span>
         </div>
         <div className="top-nav-links">
-          <span style={{ fontSize: '0.8rem', color: '#9ca3af', marginRight: '0.5rem' }}>
+          <span
+            style={{
+              fontSize: '0.8rem',
+              color: '#9ca3af',
+              marginRight: '0.5rem',
+            }}
+          >
             {currentUser.username}
           </span>
-          <button
-            type="button"
-            className="nav-link-button"
-            onClick={onBack}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button type="button" className="nav-link-button" onClick={onBack}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
             Back to Chats
@@ -384,7 +452,8 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           <div>
             <h1 className="chat-title">Your Team Chat</h1>
             <p className="chat-subtitle">
-              Squad up with real friends, place friendly point bets, and track who wears the crown.
+              Squad up with real friends, place friendly point bets, and track
+              who wears the crown.
             </p>
             <div className="chat-title-actions">
               <button
@@ -399,7 +468,9 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         </div>
         <div className="chat-meta">
           <span className="chat-pill live-pill">Live</span>
-          <span className="chat-pill points-pill">Points Only · Zero Cash Risk</span>
+          <span className="chat-pill points-pill">
+            Points Only · Zero Cash Risk
+          </span>
         </div>
       </header>
 
@@ -411,11 +482,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 <span className="prediction-badge">Current Prediction</span>
                 <div className="prediction-right">
                   <span className="prediction-meta">
-                    {currentPrediction.sport} · {currentPrediction.category} · Bet due by{' '}
-                    {formatDueBy(currentPrediction.dueBy)}
+                    {currentPrediction.sport} · {currentPrediction.category} ·
+                    Bet due by {formatDueBy(currentPrediction.dueBy)}
                   </span>
                   {currentPrediction.createdBy === 'You' && (
-                    <div className="prediction-actions" aria-label="Prediction actions">
+                    <div
+                      className="prediction-actions"
+                      aria-label="Prediction actions"
+                    >
                       <button
                         type="button"
                         className="prediction-icon-button"
@@ -475,7 +549,8 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               <div className="prediction-banner-body">
                 <p className="prediction-text">{currentPrediction.text}</p>
                 <div className="prediction-range">
-                  Bet range: <strong>{currentPrediction.minPoints}</strong>–<strong>{currentPrediction.maxPoints}</strong> pts
+                  Bet range: <strong>{currentPrediction.minPoints}</strong>–
+                  <strong>{currentPrediction.maxPoints}</strong> pts
                 </div>
               </div>
             </div>
@@ -487,7 +562,9 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 className={`chat-message-row ${m.isOwn ? 'own' : 'other'}`}
               >
                 {!m.isOwn && (
-                  <div className="chat-message-avatar">{m.sender.charAt(0)}</div>
+                  <div className="chat-message-avatar">
+                    {m.sender.charAt(0)}
+                  </div>
                 )}
                 <div className="chat-message-bubble">
                   <div className="chat-message-header">
@@ -523,16 +600,23 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           <div className="sidebar-card">
             <h2>Team Focus</h2>
             <p>
-              This is your private team locker room. Spin up friendly point bets, call your picks,
-              and keep the sweat fun without touching real money.
+              This is your private team locker room. Spin up friendly point
+              bets, call your picks, and keep the sweat fun without touching
+              real money.
             </p>
           </div>
           <div className="sidebar-card">
             <h3>How Your Team Uses Points</h3>
             <ul>
               <li>Place head-to-head or squad bets in points, never cash.</li>
-              <li>Set fun stakes: bragging rights, snacks, or picking next week&apos;s game.</li>
-              <li>Track who&apos;s hot and who&apos;s on a cold streak — all inside ChatKings.</li>
+              <li>
+                Set fun stakes: bragging rights, snacks, or picking next
+                week&apos;s game.
+              </li>
+              <li>
+                Track who&apos;s hot and who&apos;s on a cold streak — all
+                inside ChatKings.
+              </li>
             </ul>
           </div>
         </aside>
@@ -543,12 +627,19 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           className="modal-overlay"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closePrediction()
+            if (e.target === e.currentTarget) closePrediction();
           }}
         >
-          <div className="modal-shell" role="dialog" aria-modal="true" aria-label="Make a Prediction">
+          <div
+            className="modal-shell"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Make a Prediction"
+          >
             <div className="modal-header">
-              <h2 className="modal-title">{isEditingPrediction ? 'Edit Prediction' : 'Make a Prediction'}</h2>
+              <h2 className="modal-title">
+                {isEditingPrediction ? 'Edit Prediction' : 'Make a Prediction'}
+              </h2>
               <button
                 type="button"
                 className="modal-close-button"
@@ -570,7 +661,10 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                   ref={predictionSportRef}
                   value={predictionDraft.sport}
                   onChange={(e) =>
-                    setPredictionDraft((prev) => ({ ...prev, sport: e.target.value as Sport }))
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      sport: e.target.value as Sport,
+                    }))
                   }
                 >
                   <option value="Basketball">Basketball</option>
@@ -608,7 +702,12 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                   className="modal-control"
                   placeholder="E.g., Over 100 points, Team A wins, etc."
                   value={predictionDraft.text}
-                  onChange={(e) => setPredictionDraft((prev) => ({ ...prev, text: e.target.value }))}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      text: e.target.value,
+                    }))
+                  }
                   onBlur={() => setPredictionTouched(true)}
                 />
               </div>
@@ -622,11 +721,17 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                   type="datetime-local"
                   className="modal-control"
                   value={predictionDraft.dueBy}
-                  onChange={(e) => setPredictionDraft((prev) => ({ ...prev, dueBy: e.target.value }))}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      dueBy: e.target.value,
+                    }))
+                  }
                   onBlur={() => setPredictionTouched(true)}
                 />
                 <div className="modal-help">
-                  For now, use the game start time so everyone knows when picks lock.
+                  For now, use the game start time so everyone knows when picks
+                  lock.
                 </div>
               </div>
 
@@ -686,10 +791,18 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               )}
 
               <div className="modal-actions">
-                <button type="button" className="modal-secondary-button" onClick={closePrediction}>
+                <button
+                  type="button"
+                  className="modal-secondary-button"
+                  onClick={closePrediction}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="modal-primary-button" disabled={!canSubmitPrediction}>
+                <button
+                  type="submit"
+                  className="modal-primary-button"
+                  disabled={!canSubmitPrediction}
+                >
                   {isEditingPrediction ? 'Save Prediction' : 'Make Prediction'}
                 </button>
               </div>
@@ -698,5 +811,5 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
