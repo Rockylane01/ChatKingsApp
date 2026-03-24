@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import type { User } from './types'
 
 interface CreateUserProps {
   onBack: () => void
+  onCreated: (user: User) => void
 }
 
-export default function CreateUser({ onBack }: CreateUserProps) {
+export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
@@ -40,6 +42,10 @@ export default function CreateUser({ onBack }: CreateUserProps) {
         setError(text || 'Failed to create user.')
         return
       }
+
+      const createdUser: User = await res.json()
+      sessionStorage.setItem('currentUser', JSON.stringify(createdUser))
+      onCreated(createdUser)
 
       setSuccess(true)
       setUsername('')
