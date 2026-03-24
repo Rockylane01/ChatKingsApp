@@ -15,14 +15,18 @@ public class ChatKingsDbContext : DbContext
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<Chat> Chats => Set<Chat>();
     public DbSet<ChatMember> ChatMembers => Set<ChatMember>();
-    public DbSet<Message> Messages => Set<Message>();
-    public DbSet<Bet> Bets => Set<Bet>();
-    public DbSet<Game> Games => Set<Game>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<Team> Teams => Set<Team>();
+    public DbSet<Game> Games => Set<Game>();
+    public DbSet<GameTeamStat> GameTeamStats => Set<GameTeamStat>();
     public DbSet<ChatTeam> ChatTeams => Set<ChatTeam>();
-    public DbSet<GameStat> GameStats => Set<GameStat>();
-    public DbSet<DailyStrike> DailyStrikes => Set<DailyStrike>();
-    public DbSet<BetHistory> BetHistories => Set<BetHistory>();
+    public DbSet<Prediction> Predictions => Set<Prediction>();
+    public DbSet<PredictionOption> PredictionOptions => Set<PredictionOption>();
+    public DbSet<Wager> Wagers => Set<Wager>();
+    public DbSet<PredictionResolution> PredictionResolutions => Set<PredictionResolution>();
+    public DbSet<StrikeEvent> StrikeEvents => Set<StrikeEvent>();
+    public DbSet<PointsLedger> PointsLedgers => Set<PointsLedger>();
+    public DbSet<ChatLeaderboardSnapshot> ChatLeaderboardSnapshots => Set<ChatLeaderboardSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,81 +34,113 @@ public class ChatKingsDbContext : DbContext
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.ToTable("USERS");
+            entity.ToTable("users");
             entity.HasKey(e => e.user_id);
         });
 
         modelBuilder.Entity<FriendRequest>(entity =>
         {
-            entity.ToTable("FRIEND_REQUESTS");
+            entity.ToTable("friend_requests");
             entity.HasKey(e => e.request_id);
         });
 
         modelBuilder.Entity<Friendship>(entity =>
         {
-            entity.ToTable("FRIENDSHIPS");
+            entity.ToTable("friendships");
             entity.HasKey(e => e.friendship_id);
         });
 
         modelBuilder.Entity<Chat>(entity =>
         {
-            entity.ToTable("CHATS");
+            entity.ToTable("chats");
             entity.HasKey(e => e.chat_id);
         });
 
         modelBuilder.Entity<ChatMember>(entity =>
         {
-            entity.ToTable("CHAT_MEMBERS");
-            entity.HasKey(e => e.member_id);
+            entity.ToTable("chat_members");
+            entity.HasKey(e => e.chat_member_id);
         });
 
-        modelBuilder.Entity<Message>(entity =>
+        modelBuilder.Entity<ChatMessage>(entity =>
         {
-            entity.ToTable("MESSAGES");
+            entity.ToTable("chat_messages");
             entity.HasKey(e => e.message_id);
-        });
-
-        modelBuilder.Entity<Bet>(entity =>
-        {
-            entity.ToTable("BETS");
-            entity.HasKey(e => e.bet_id);
-        });
-
-        modelBuilder.Entity<Game>(entity =>
-        {
-            entity.ToTable("GAMES");
-            entity.HasKey(e => e.game_id);
         });
 
         modelBuilder.Entity<Team>(entity =>
         {
-            entity.ToTable("TEAMS");
+            entity.ToTable("teams");
             entity.HasKey(e => e.team_id);
+        });
+
+        modelBuilder.Entity<Game>(entity =>
+        {
+            entity.ToTable("games");
+            entity.HasKey(e => e.game_id);
+        });
+
+        modelBuilder.Entity<GameTeamStat>(entity =>
+        {
+            entity.ToTable("game_team_stats");
+            entity.HasKey(e => e.stat_id);
         });
 
         modelBuilder.Entity<ChatTeam>(entity =>
         {
-            entity.ToTable("CHAT_TEAMS");
+            entity.ToTable("chat_teams");
             entity.HasKey(e => e.chat_team_id);
         });
 
-        modelBuilder.Entity<GameStat>(entity =>
+        modelBuilder.Entity<Prediction>(entity =>
         {
-            entity.ToTable("GAME_STATS");
-            entity.HasKey(e => e.stat_id);
+            entity.ToTable("predictions");
+            entity.HasKey(e => e.prediction_id);
         });
 
-        modelBuilder.Entity<DailyStrike>(entity =>
+        modelBuilder.Entity<PredictionOption>(entity =>
         {
-            entity.ToTable("DAILY_STRIKES");
-            entity.HasKey(e => e.strike_id);
+            entity.ToTable("prediction_options");
+            entity.HasKey(e => e.option_id);
+            entity.HasOne<Prediction>()
+                .WithMany(p => p.Options)
+                .HasForeignKey(e => e.prediction_id);
         });
 
-        modelBuilder.Entity<BetHistory>(entity =>
+        modelBuilder.Entity<Wager>(entity =>
         {
-            entity.ToTable("BET_HISTORY");
-            entity.HasKey(e => e.history_id);
+            entity.ToTable("wagers");
+            entity.HasKey(e => e.wager_id);
+            entity.HasOne(w => w.Prediction)
+                .WithMany(p => p.Wagers)
+                .HasForeignKey(w => w.prediction_id);
+            entity.HasOne(w => w.PredictionOption)
+                .WithMany(o => o.Wagers)
+                .HasForeignKey(w => w.option_id);
+        });
+
+        modelBuilder.Entity<PredictionResolution>(entity =>
+        {
+            entity.ToTable("prediction_resolutions");
+            entity.HasKey(e => e.resolution_id);
+        });
+
+        modelBuilder.Entity<StrikeEvent>(entity =>
+        {
+            entity.ToTable("strike_events");
+            entity.HasKey(e => e.strike_event_id);
+        });
+
+        modelBuilder.Entity<PointsLedger>(entity =>
+        {
+            entity.ToTable("points_ledger");
+            entity.HasKey(e => e.ledger_id);
+        });
+
+        modelBuilder.Entity<ChatLeaderboardSnapshot>(entity =>
+        {
+            entity.ToTable("chat_leaderboard_snapshots");
+            entity.HasKey(e => e.snapshot_id);
         });
     }
 }
-

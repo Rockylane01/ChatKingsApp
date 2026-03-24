@@ -11,7 +11,7 @@ interface User {
   phone_number: string | null
   add_code: string
   profile_image_url: string | null
-  all_time_points: number
+  lifetime_points: number
 }
 
 function App() {
