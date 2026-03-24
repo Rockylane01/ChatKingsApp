@@ -1,4 +1,5 @@
-import type { User } from './types'
+import { useEffect, useState } from 'react'
+import type { TickerGame, User } from './types'
 
 interface HomePageProps {
   currentUser: User
@@ -6,14 +7,6 @@ interface HomePageProps {
   onOpenAccount: () => void
   onLogout: () => void
 }
-
-const liveEvents = [
-  { league: 'NBA', matchup: 'Lakers vs Warriors', score: '102 - 99', status: 'Q4 6:12' },
-  { league: 'NFL', matchup: 'Chiefs vs Bills', score: '24 - 21', status: 'Q3 2:04' },
-  { league: 'MLB', matchup: 'Yankees vs Red Sox', score: '5 - 4', status: 'Top 8' },
-  { league: 'NHL', matchup: 'Rangers vs Bruins', score: '3 - 2', status: '3rd 11:09' },
-  { league: 'NCAAF', matchup: 'Texas vs Alabama', score: '17 - 20', status: 'Q2 0:42' },
-]
 
 const currentBets = [
   {
@@ -48,6 +41,26 @@ export default function HomePage({
   onOpenAccount,
   onLogout,
 }: HomePageProps) {
+  const [tickerGames, setTickerGames] = useState<TickerGame[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/scoreboard/ncaam')
+        if (!res.ok) return
+        const data = (await res.json()) as TickerGame[]
+        if (!Array.isArray(data) || cancelled) return
+        setTickerGames(data.filter((g) => g?.id && g?.matchup))
+      } catch {
+        /* ticker is optional */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="dashboard-page">
       <nav className="top-nav">
@@ -67,18 +80,20 @@ export default function HomePage({
         </div>
       </nav>
 
-      <section className="score-ticker" aria-label="Live sporting events">
-        <div className="score-ticker-track">
-          {[...liveEvents, ...liveEvents].map((event, idx) => (
-            <article className="score-ticker-item" key={`${event.matchup}-${idx}`}>
-              <span className="score-league">{event.league}</span>
-              <span className="score-matchup">{event.matchup}</span>
-              <span className="score-line">{event.score}</span>
-              <span className="score-status">{event.status}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+      {tickerGames.length > 0 ? (
+        <section className="score-ticker" aria-label="NCAA men's basketball scores">
+          <div className="score-ticker-track">
+            {[...tickerGames, ...tickerGames].map((event, idx) => (
+              <article className="score-ticker-item" key={`${event.id}-${idx}`}>
+                <span className="score-league">{event.league}</span>
+                <span className="score-matchup">{event.matchup}</span>
+                <span className="score-line">{event.score}</span>
+                <span className="score-status">{event.status}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="dashboard-hero">
         <div className="dashboard-card">
