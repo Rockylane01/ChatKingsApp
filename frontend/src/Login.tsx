@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { User } from './types'
 
 interface User {
   user_id: number
@@ -39,6 +40,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       }
 
       const user: User = await res.json()
+      sessionStorage.setItem('currentUser', JSON.stringify(user))
       onLogin(user)
     } catch {
       setError('Network error. Is the backend running?')

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import type { User } from './types'
 
 type Message = {
   id: number
-  sender: 'You' | 'Teammate' | 'Coach'
+  sender: string
   text: string
   timestamp: string
   isOwn: boolean
@@ -20,7 +21,7 @@ type Prediction = {
   maxPoints: number
   dueBy: string
   createdAt: string
-  createdBy: 'You'
+  createdBy: string
 }
 
 type BetResponse = {
@@ -36,7 +37,13 @@ type BetResponse = {
   resolved_at: string | null
 }
 
-export default function Chat() {
+interface ChatProps {
+  currentUser: User
+  chatId: number
+  onBack: () => void
+}
+
+export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isPredictionOpen, setIsPredictionOpen] = useState(false)
@@ -44,6 +51,7 @@ export default function Chat() {
   const [currentBetId, setCurrentBetId] = useState<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isEditingPrediction, setIsEditingPrediction] = useState(false)
+  const [memberNames, setMemberNames] = useState<Map<number, string>>(new Map())
   const [predictionDraft, setPredictionDraft] = useState({
     sport: 'Basketball' as Sport,
     category: 'Points' as PredictionCategory,
@@ -54,6 +62,8 @@ export default function Chat() {
   })
   const [predictionTouched, setPredictionTouched] = useState(false)
   const predictionSportRef = useRef<HTMLSelectElement | null>(null)
+  const lastMessageIdRef = useRef<number>(0)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const closePrediction = useCallback(() => {
     setIsPredictionOpen(false)
@@ -62,24 +72,81 @@ export default function Chat() {
     setSubmitError(null)
   }, [])
 
+  // Fetch members for name resolution
+  useEffect(() => {
+    fetch(`/api/chats/${chatId}/members`)
+      .then((res) => res.json())
+      .then((data: Array<{ user_id: number; username: string }>) => {
+        const map = new Map<number, string>()
+        data.forEach((m) => map.set(m.user_id, m.username))
+        setMemberNames(map)
+      })
+      .catch(() => {})
+  }, [chatId])
+
+  const resolveMessage = useCallback(
+    (m: { message_id: number; user_id: number; message_text: string; sent_at: string }) => ({
+      id: m.message_id,
+      sender: m.user_id === currentUser.user_id ? 'You' : (memberNames.get(m.user_id) ?? 'Unknown'),
+      text: m.message_text,
+      timestamp: new Date(m.sent_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      isOwn: m.user_id === currentUser.user_id,
+    }),
+    [currentUser.user_id, memberNames]
+  )
+
+  // Initial message fetch
+  useEffect(() => {
   const chatId = 1
 
   useEffect(() => {
     fetch(`/api/messages?chatId=${chatId}`)
       .then((res) => res.json())
       .then((data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }>) => {
-        setMessages(
-          data.map((m) => ({
-            id: m.message_id,
-            sender: m.user_id === 1 ? 'You' : 'Teammate',
-            text: m.message_text,
-            timestamp: new Date(m.sent_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-            isOwn: m.user_id === 1,
-          }))
-        )
+        setMessages(data.map(resolveMessage))
+        if (data.length > 0) {
+          lastMessageIdRef.current = Math.max(...data.map((m) => m.message_id))
+        }
       })
-      .catch(() => {/* backend not reachable yet */})
-  }, [])
+      .catch(() => {})
+  }, [chatId, resolveMessage])
+
+  // Polling for new messages every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`
+        )
+        if (!res.ok) return
+        const data: Array<{ message_id: number; user_id: number; message_text: string; sent_at: string }> =
+          await res.json()
+        if (data.length === 0) return
+
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id))
+          const newMsgs = data
+            .filter((m) => !existingIds.has(m.message_id))
+            .map(resolveMessage)
+          return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
+        })
+
+        lastMessageIdRef.current = Math.max(
+          lastMessageIdRef.current,
+          ...data.map((m) => m.message_id)
+        )
+      } catch {
+        // swallow network errors during polling
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [chatId, resolveMessage])
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   useEffect(() => {
     fetch(`/api/bets?chatId=${chatId}`)
@@ -139,8 +206,8 @@ export default function Chat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: 1,
-          user_id: 1,
+          chat_id: chatId,
+          user_id: currentUser.user_id,
           message_type: 'text',
           message_text: text,
         }),
@@ -164,6 +231,7 @@ export default function Chat() {
       }
 
       setMessages((prev) => [...prev, newMessage])
+      lastMessageIdRef.current = Math.max(lastMessageIdRef.current, saved.message_id)
     } catch {
       console.error('Network error sending message.')
     }
@@ -203,7 +271,7 @@ export default function Chat() {
     const betPayload = {
       chat_id: chatId,
       game_id: 1,
-      user_id: 1,
+      user_id: currentUser.user_id,
       bet_category: `${predictionDraft.sport}:${predictionDraft.category}`,
       prediction_details_json: JSON.stringify(predictionDetails),
       points_wagered: Number(predictionDraft.minPoints),
@@ -244,7 +312,7 @@ export default function Chat() {
         maxPoints: details.maxPoints,
         dueBy: details.dueBy,
         createdAt: new Date(saved.placed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        createdBy: 'You',
+        createdBy: saved.user_id === currentUser.user_id ? 'You' : (memberNames.get(saved.user_id) ?? 'Unknown'),
       })
       setCurrentBetId(saved.bet_id)
       closePrediction()
@@ -294,15 +362,18 @@ export default function Chat() {
           <span className="brand-mark">ChatKings</span>
         </div>
         <div className="top-nav-links">
+          <span style={{ fontSize: '0.8rem', color: '#9ca3af', marginRight: '0.5rem' }}>
+            {currentUser.username}
+          </span>
           <button
             type="button"
             className="nav-link-button"
-            // TODO: Replace with real navigation when the homepage route exists
-            onClick={() => {
-              // Placeholder for future navigation to Homepage
-            }}
+            onClick={onBack}
           >
-            Home (coming soon)
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            Back to Chats
           </button>
         </div>
       </nav>
@@ -427,6 +498,7 @@ export default function Chat() {
                 </div>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
 
           <form className="chat-input-row" onSubmit={handleSend}>

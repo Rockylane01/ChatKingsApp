@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import Chat from './Chat'
+import ChatList from './ChatList'
 import CreateUser from './CreateUser'
 import Login from './Login'
+import type { User } from './types'
 
 interface User {
   user_id: number
@@ -15,11 +17,52 @@ interface User {
 }
 
 function App() {
-  const [page, setPage] = useState<'home' | 'chat' | 'create-user' | 'login'>('home')
+  const [page, setPage] = useState<'home' | 'chat' | 'chat-list' | 'create-user' | 'login'>('home')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
 
-  if (page === 'chat') {
-    return <Chat />
+  // Restore session on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem('currentUser')
+    if (stored) {
+      try {
+        const user: User = JSON.parse(stored)
+        setCurrentUser(user)
+        setPage('chat-list')
+      } catch {
+        sessionStorage.removeItem('currentUser')
+      }
+    }
+  }, [])
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('currentUser')
+    setCurrentUser(null)
+    setSelectedChatId(null)
+    setPage('home')
+  }
+
+  if (page === 'chat' && currentUser && selectedChatId) {
+    return (
+      <Chat
+        currentUser={currentUser}
+        chatId={selectedChatId}
+        onBack={() => setPage('chat-list')}
+      />
+    )
+  }
+
+  if (page === 'chat-list' && currentUser) {
+    return (
+      <ChatList
+        currentUser={currentUser}
+        onSelectChat={(chatId: number) => {
+          setSelectedChatId(chatId)
+          setPage('chat')
+        }}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   if (page === 'create-user') {
@@ -32,7 +75,7 @@ function App() {
         onBack={() => setPage('home')}
         onLogin={user => {
           setCurrentUser(user)
-          setPage('chat')
+          setPage('chat-list')
         }}
       />
     )
@@ -52,11 +95,6 @@ function App() {
             Create Account
           </button>
         </div>
-        {currentUser && (
-          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#9ca3af' }}>
-            Signed in as <strong style={{ color: '#e5e7eb' }}>{currentUser.username}</strong>
-          </p>
-        )}
       </div>
     </div>
   );

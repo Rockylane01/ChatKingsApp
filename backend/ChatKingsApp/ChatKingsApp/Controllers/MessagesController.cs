@@ -54,8 +54,10 @@ public class MessagesController : ControllerBase
         return CreatedAtAction(nameof(GetMessage), new { id = message.message_id }, dto);
     }
 
-    // GET api/messages?chatId={id}
+    // GET api/messages?chatId={id}&after={messageId}
     [HttpGet]
+    public async Task<ActionResult<IEnumerable<Message>>> GetMessages(
+        [FromQuery] int? chatId, [FromQuery] int? after)
     public async Task<ActionResult<IEnumerable<object>>> GetMessages([FromQuery] int? chatId)
     {
         var query = _context.ChatMessages.AsQueryable();
@@ -63,6 +65,11 @@ public class MessagesController : ControllerBase
         if (chatId.HasValue)
             query = query.Where(m => m.chat_id == chatId.Value);
 
+        if (after.HasValue)
+            query = query.Where(m => m.message_id > after.Value);
+
+        var messages = await query.OrderBy(m => m.sent_at).ToListAsync();
+        return Ok(messages);
         var messages = await query.OrderBy(m => m.created_at).ToListAsync();
         // Map to frontend shape: user_id, sent_at
         var dtos = messages.Select(m => new
