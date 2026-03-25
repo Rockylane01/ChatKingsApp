@@ -1,12 +1,29 @@
 /**
- * When VITE_API_URL is unset, paths stay relative so the Vite dev proxy can
- * forward /api to the local backend. In production (Dokploy), set VITE_API_URL
- * to the API origin, e.g. https://api.example.com — no trailing slash.
+ * Production (Cloudflare / tunnel): prefer `VITE_API_HOST` (hostname only). The
+ * browser uses the same scheme as the page (`window.location.protocol`), so API
+ * calls stay https when the site is https and avoid mixed-content mistakes from
+ * a wrong `VITE_API_URL` scheme.
+ *
+ * Override with full `VITE_API_URL` if you need an explicit origin (e.g. tests).
+ *
+ * Local dev: leave both unset — paths stay relative and Vite proxies `/api`.
  */
 export function apiUrl(path: string): string {
-  const raw = import.meta.env.VITE_API_URL;
-  const base =
-    typeof raw === 'string' && raw.length > 0 ? raw.replace(/\/+$/, '') : '';
   const segment = path.startsWith('/') ? path : `/${path}`;
-  return base ? `${base}${segment}` : segment;
+
+  const host = import.meta.env.VITE_API_HOST?.trim();
+  if (host) {
+    const h = host.replace(/\/+$/, '');
+    const protocol =
+      typeof window !== 'undefined' ? window.location.protocol : 'https:';
+    return `${protocol}//${h}${segment}`;
+  }
+
+  const raw = import.meta.env.VITE_API_URL?.trim();
+  if (raw) {
+    const base = raw.replace(/\/+$/, '');
+    return `${base}${segment}`;
+  }
+
+  return segment;
 }

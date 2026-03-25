@@ -57,7 +57,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseForwardedHeaders();
-app.UseHttpsRedirection();
+
+// TLS terminates at Cloudflare / tunnel; Kestrel is HTTP-only. Redirecting to
+// HTTPS here breaks or complicates API calls when X-Forwarded-Proto is http.
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(policy => policy
     .AllowAnyOrigin()
