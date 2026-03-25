@@ -7,10 +7,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 if (!builder.Environment.IsDevelopment())
 {
+    // Railpack / many PaaS images set PORT (often 3000). Dokploy/Traefik "container
+    // port" for this service must match whatever Kestrel binds — see hosting logs.
+    // Override with ASPNETCORE_URLS=http://0.0.0.0:8080 if your proxy targets 8080.
     var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
     if (string.IsNullOrEmpty(urls))
     {
-        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
         builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
     }
 }
