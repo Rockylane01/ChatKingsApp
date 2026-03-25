@@ -1,8 +1,27 @@
 using ChatKingsApp.Data;
 using ChatKingsApp.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (!builder.Environment.IsDevelopment())
+{
+    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+    if (string.IsNullOrEmpty(urls))
+    {
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+    }
+}
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 
@@ -22,6 +41,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 
 app.UseCors(policy => policy
