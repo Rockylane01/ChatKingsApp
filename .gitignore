@@ -372,6 +372,3 @@ FodyWeavers.xsd
 
 #Claude Settings
 .claude
-
-# Potential Environment variables
-frontend/.env.example
