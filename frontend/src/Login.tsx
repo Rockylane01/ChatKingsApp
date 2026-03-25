@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apiUrl } from './apiBase'
 import type { User } from './types'
 
 interface LoginProps {
@@ -17,7 +18,9 @@ export default function Login({ onLogin, onBack }: LoginProps) {
     setLoading(true)
 
     try {
-      const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`)
+      const res = await fetch(
+        apiUrl(`/api/users?email=${encodeURIComponent(email)}`)
+      )
 
       if (res.status === 404) {
         setError('No account found with that email.')
