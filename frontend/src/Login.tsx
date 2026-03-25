@@ -19,7 +19,7 @@ export default function Login({ onLogin, onBack }: LoginProps) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/users/login', {
+      const res = await fetch(apiUrl('/api/users/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
