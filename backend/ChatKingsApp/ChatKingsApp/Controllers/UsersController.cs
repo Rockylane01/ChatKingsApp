@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using ChatKingsApp.Data;
 using ChatKingsApp.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +30,11 @@ public class UsersController : ControllerBase
         if (string.IsNullOrWhiteSpace(user.add_code))
             return BadRequest("add_code is required.");
 
+        if (string.IsNullOrWhiteSpace(user.password))
+            return BadRequest("password is required.");
+
         user.user_id = 0;
+        user.password_hash = HashPassword(user.password);
         user.created_at = DateTime.UtcNow;
         user.updated_at = DateTime.UtcNow;
 
@@ -37,6 +42,18 @@ public class UsersController : ControllerBase
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetUser), new { id = user.user_id }, user);
+    }
+
+    // POST api/users/login
+    [HttpPost("login")]
+    public async Task<ActionResult<User>> Login([FromBody] LoginRequest req)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.username == req.Username);
+
+        if (user is null || !VerifyPassword(req.Password, user.password_hash ?? ""))
+            return Unauthorized("Invalid username or password.");
+
+        return Ok(user);
     }
 
     // PUT api/users/{id}
@@ -54,6 +71,9 @@ public class UsersController : ControllerBase
         existing.profile_image_url = user.profile_image_url;
         existing.lifetime_points = user.lifetime_points;
         existing.updated_at = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(user.password))
+            existing.password_hash = HashPassword(user.password);
 
         await _context.SaveChangesAsync();
 
@@ -74,16 +94,10 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    // GET api/users?email=…
+    // GET api/users
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<User>>> GetUsers([FromQuery] string? email)
+    public async Task<ActionResult<IEnumerable<User>>> GetUsers()
     {
-        if (!string.IsNullOrWhiteSpace(email))
-        {
-            var match = await _context.Users.FirstOrDefaultAsync(u => u.email == email);
-            return match is null ? NotFound() : Ok(match);
-        }
-
         return Ok(await _context.Users.ToListAsync());
     }
 
@@ -102,4 +116,25 @@ public class UsersController : ControllerBase
         var user = await _context.Users.FirstOrDefaultAsync(u => u.add_code == addCode);
         return user is null ? NotFound() : Ok(user);
     }
+
+    private static string HashPassword(string password)
+    {
+        byte[] salt = RandomNumberGenerator.GetBytes(16);
+        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(
+            password, salt, 100_000, HashAlgorithmName.SHA256, 32);
+        return $"{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
+    }
+
+    private static bool VerifyPassword(string password, string stored)
+    {
+        var parts = stored.Split(':');
+        if (parts.Length != 2) return false;
+        byte[] salt = Convert.FromBase64String(parts[0]);
+        byte[] expectedHash = Convert.FromBase64String(parts[1]);
+        byte[] actualHash = Rfc2898DeriveBytes.Pbkdf2(
+            password, salt, 100_000, HashAlgorithmName.SHA256, 32);
+        return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
+    }
 }
+
+public record LoginRequest(string Username, string Password);

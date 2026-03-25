@@ -12,15 +12,23 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
   const [phoneNumber, setPhoneNumber] = useState('')
   const [addCode, setAddCode] = useState('')
   const [profileImageUrl, setProfileImageUrl] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault: () => void }) {
     e.preventDefault()
     setError('')
     setSuccess(false)
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -34,6 +42,7 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
           add_code: addCode,
           profile_image_url: profileImageUrl || null,
           lifetime_points: 0,
+          password,
         }),
       })
 
@@ -53,6 +62,8 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
       setPhoneNumber('')
       setAddCode('')
       setProfileImageUrl('')
+      setPassword('')
+      setConfirmPassword('')
     } catch {
       setError('Network error. Is the backend running?')
     } finally {
@@ -147,6 +158,33 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
               placeholder="https://… (optional)"
               value={profileImageUrl}
               onChange={e => setProfileImageUrl(e.target.value)}
+            />
+          </div>
+
+          <div className="modal-row">
+            <label className="modal-label" htmlFor="password">Password *</label>
+            <input
+              id="password"
+              className="modal-control"
+              type="password"
+              placeholder="Min. 8 characters"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+          </div>
+
+          <div className="modal-row">
+            <label className="modal-label" htmlFor="confirm-password">Confirm Password *</label>
+            <input
+              id="confirm-password"
+              className="modal-control"
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              required
             />
           </div>
 
