@@ -19,8 +19,23 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
         ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
+    // Trust only typical reverse-proxy paths (private/container nets). Clearing
+    // KnownIPNetworks/KnownProxies without replacing them would trust spoofed
+    // X-Forwarded-* from any remote IP.
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+    foreach (var cidr in new[]
+             {
+                 "10.0.0.0/8",
+                 "172.16.0.0/12",
+                 "192.168.0.0/16",
+                 "127.0.0.0/8",
+                 "::1/128",
+                 "fe80::/10",
+                 "fc00::/7",
+             })
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
+    options.ForwardLimit = 2;
 });
 
 // Add services to the container.
