@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiUrl } from './apiBase'
 import type { User, Chat } from './types'
 
 interface ChatListProps {
@@ -20,8 +21,8 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
   const fetchChats = async () => {
     try {
       const [myRes, allRes] = await Promise.all([
-        fetch(`/api/chats?userId=${currentUser.user_id}`),
-        fetch('/api/chats'),
+        fetch(apiUrl(`/api/chats?userId=${currentUser.user_id}`)),
+        fetch(apiUrl('/api/chats')),
       ])
 
       if (myRes.ok) setMyChats(await myRes.json())
@@ -50,7 +51,7 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
     }
 
     try {
-      const res = await fetch('/api/chats', {
+      const res = await fetch(apiUrl('/api/chats'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,9 +80,10 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
   const handleJoinChat = async (chatId: number) => {
     setJoiningId(chatId)
     try {
-      const res = await fetch(`/api/chats/${chatId}/join?userId=${currentUser.user_id}`, {
-        method: 'POST',
-      })
+      const res = await fetch(
+        apiUrl(`/api/chats/${chatId}/join?userId=${currentUser.user_id}`),
+        { method: 'POST' }
+      )
 
       if (res.ok) {
         await fetchChats()

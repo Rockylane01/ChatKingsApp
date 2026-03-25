@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apiUrl } from './apiBase'
 import type { User } from './types'
 
 interface LoginProps {
