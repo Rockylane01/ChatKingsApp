@@ -8,22 +8,25 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin, onBack }: LoginProps) {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault: () => void }) {
     e.preventDefault()
     setError('')
     setLoading(true)
 
     try {
-      const res = await fetch(
-        apiUrl(`/api/users?email=${encodeURIComponent(email)}`)
-      )
+      const res = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
 
-      if (res.status === 404) {
-        setError('No account found with that email.')
+      if (res.status === 401) {
+        setError('Invalid username or password.')
         return
       }
 
@@ -72,16 +75,29 @@ export default function Login({ onLogin, onBack }: LoginProps) {
 
         <form className="create-user-form" onSubmit={handleSubmit}>
           <div className="modal-row">
-            <label className="modal-label" htmlFor="login-email">Email</label>
+            <label className="modal-label" htmlFor="login-username">Username</label>
             <input
-              id="login-email"
+              id="login-username"
               className="modal-control"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              placeholder="e.g. kingslayer99"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
               autoFocus
+            />
+          </div>
+
+          <div className="modal-row">
+            <label className="modal-label" htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              className="modal-control"
+              type="password"
+              placeholder="Your password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
             />
           </div>
 
