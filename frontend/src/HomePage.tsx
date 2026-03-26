@@ -35,6 +35,8 @@ const currentBets = [
   },
 ]
 
+type WagersTotalResponse = { totalWagers?: number }
+
 export default function HomePage({
   currentUser,
   onOpenChats,
@@ -42,6 +44,7 @@ export default function HomePage({
   onLogout,
 }: HomePageProps) {
   const [tickerGames, setTickerGames] = useState<TickerGame[]>([])
+  const [totalWagers, setTotalWagers] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +57,24 @@ export default function HomePage({
         setTickerGames(data.filter((g) => g?.id && g?.matchup))
       } catch {
         /* ticker is optional */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/stats/wagers-total')
+        if (!res.ok) return
+        const data = (await res.json()) as WagersTotalResponse
+        if (cancelled || typeof data.totalWagers !== 'number') return
+        setTotalWagers(data.totalWagers)
+      } catch {
+        /* stats optional */
       }
     })()
     return () => {
@@ -105,43 +126,55 @@ export default function HomePage({
       ) : null}
 
       <section className="dashboard-hero">
-        <div className="dashboard-card">
-          <div className="home-logo">CK</div>
-          <h1 className="home-title">Welcome back, {currentUser.username}</h1>
-          <p className="home-subtitle">
-            Pick your games, drop predictions, and compete with your friends using points only.
-          </p>
+        <div className="dashboard-hero-row">
+          <div className="dashboard-card">
+            <div className="home-logo">CK</div>
+            <h1 className="home-title">Welcome back, {currentUser.username}</h1>
+            <p className="home-subtitle">
+              Pick your games, drop predictions, and compete with your friends using points only.
+            </p>
 
-          <section className="current-bets" aria-label="Current bets with friends">
-            <div className="current-bets-header">
-              <h2>Current Bets With Friends</h2>
-              <span className="current-bets-count">{currentBets.length} active</span>
-            </div>
-            <div className="current-bets-list">
-              {currentBets.map((bet) => (
-                <article className="current-bet-card" key={bet.id}>
-                  <div className="current-bet-top">
-                    <span className="current-bet-friend">vs {bet.friend}</span>
-                    <span className={`current-bet-status ${bet.status.toLowerCase()}`}>
-                      {bet.status}
-                    </span>
-                  </div>
-                  <p className="current-bet-matchup">{bet.matchup}</p>
-                  <p className="current-bet-pick">{bet.pick}</p>
-                  <p className="current-bet-points">{bet.points} pts at stake</p>
-                </article>
-              ))}
-            </div>
-          </section>
+            <section className="current-bets" aria-label="Current bets with friends">
+              <div className="current-bets-header">
+                <h2>Current Bets With Friends</h2>
+                <span className="current-bets-count">{currentBets.length} active</span>
+              </div>
+              <div className="current-bets-list">
+                {currentBets.map((bet) => (
+                  <article className="current-bet-card" key={bet.id}>
+                    <div className="current-bet-top">
+                      <span className="current-bet-friend">vs {bet.friend}</span>
+                      <span className={`current-bet-status ${bet.status.toLowerCase()}`}>
+                        {bet.status}
+                      </span>
+                    </div>
+                    <p className="current-bet-matchup">{bet.matchup}</p>
+                    <p className="current-bet-pick">{bet.pick}</p>
+                    <p className="current-bet-points">{bet.points} pts at stake</p>
+                  </article>
+                ))}
+              </div>
+            </section>
 
-          <div className="home-actions">
-            <button type="button" className="modal-primary-button home-btn" onClick={onOpenChats}>
-              Open Team Chats
-            </button>
-            <button type="button" className="modal-secondary-button home-btn" onClick={onOpenAccount}>
-              Go to Account
-            </button>
+            <div className="home-actions">
+              <button type="button" className="modal-primary-button home-btn" onClick={onOpenChats}>
+                Open Team Chats
+              </button>
+              <button type="button" className="modal-secondary-button home-btn" onClick={onOpenAccount}>
+                Go to Account
+              </button>
+            </div>
           </div>
+
+          <aside className="okr-card" aria-label="Community OKR: total wagers">
+            <p className="okr-label">Community OKR</p>
+            <p className="okr-objective">Grow engagement through friendly competition</p>
+            <p className="okr-value" aria-live="polite">
+              {totalWagers === null ? '—' : totalWagers.toLocaleString()}
+            </p>
+            <p className="okr-metric-name">Total wagers placed</p>
+            <p className="okr-footnote">All users · all time</p>
+          </aside>
         </div>
       </section>
     </div>
