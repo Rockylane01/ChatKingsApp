@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import AccountPage from './AccountPage'
 import Chat from './Chat'
 import ChatList from './ChatList'
 import CreateUser from './CreateUser'
@@ -96,34 +97,13 @@ function App() {
 
   if (page === 'account' && currentUser) {
     return (
-      <div className="account-page">
-        <nav className="top-nav">
-          <div className="top-nav-left">
-            <span className="brand-mark">ChatKings</span>
-          </div>
-          <div className="top-nav-links">
-            <button type="button" className="nav-link-button" onClick={() => setPage('dashboard')}>
-              Home
-            </button>
-            <button type="button" className="nav-link-button" onClick={() => setPage('chat-list')}>
-              Chats
-            </button>
-            <button type="button" className="nav-link-button" onClick={handleLogout}>
-              Sign Out
-            </button>
-          </div>
-        </nav>
-
-        <div className="account-card">
-          <h1 className="chat-title">Account</h1>
-          <p className="chat-subtitle">Account page placeholder (profile/settings coming soon).</p>
-          <div className="account-meta">
-            <span>Username: {currentUser.username}</span>
-            <span>Email: {currentUser.email}</span>
-            <span>Add Code: {currentUser.add_code}</span>
-          </div>
-        </div>
-      </div>
+      <AccountPage
+        currentUser={currentUser}
+        onUserUpdated={user => setCurrentUser(user)}
+        onGoHome={() => setPage('dashboard')}
+        onGoChats={() => setPage('chat-list')}
+        onLogout={handleLogout}
+      />
     )
   }
 

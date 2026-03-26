@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
+import { apiUrl } from './apiBase';
 import type { User } from './types';
 
 type Message = {
@@ -78,7 +79,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
 
   // Fetch members for name resolution
   useEffect(() => {
-    fetch(`/api/chats/${chatId}/members`)
+    fetch(apiUrl(`/api/chats/${chatId}/members`))
       .then((res) => res.json())
       .then((data: Array<{ user_id: number; username: string }>) => {
         const map = new Map<number, string>();
@@ -112,7 +113,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
 
   // Initial message fetch
   useEffect(() => {
-    fetch(`/api/messages?chatId=${chatId}`)
+    fetch(apiUrl(`/api/messages?chatId=${chatId}`))
       .then((res) => res.json())
       .then(
         (
@@ -139,7 +140,9 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(
-          `/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`
+          apiUrl(
+            `/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`
+          )
         );
         if (!res.ok) return;
         const data: Array<{
@@ -176,7 +179,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   }, [messages]);
 
   useEffect(() => {
-    fetch(`/api/bets?chatId=${chatId}`)
+    fetch(apiUrl(`/api/bets?chatId=${chatId}`))
       .then((res) => res.json())
       .then((bets: BetResponse[]) => {
         const pending = bets.find((b) => b.status === 'pending');
@@ -237,7 +240,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     setInput('');
 
     try {
-      const res = await fetch('/api/messages', {
+      const res = await fetch(apiUrl('/api/messages'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,13 +327,13 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     try {
       let res: Response;
       if (isEditingPrediction && currentBetId !== null) {
-        res = await fetch(`/api/bets/${currentBetId}`, {
+        res = await fetch(apiUrl(`/api/bets/${currentBetId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...betPayload, bet_id: currentBetId }),
         });
       } else {
-        res = await fetch('/api/bets', {
+        res = await fetch(apiUrl('/api/bets'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(betPayload),
@@ -388,7 +391,9 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const handleDeletePrediction = async () => {
     if (currentBetId !== null) {
       try {
-        await fetch(`/api/bets/${currentBetId}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/bets/${currentBetId}`), {
+          method: 'DELETE',
+        });
       } catch {
         // best-effort delete; clear locally regardless
       }

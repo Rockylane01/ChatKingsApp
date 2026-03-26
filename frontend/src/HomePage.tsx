@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiUrl } from './apiBase'
 import type { TickerGame, User } from './types'
 
 interface HomePageProps {
@@ -50,7 +51,7 @@ export default function HomePage({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/scoreboard/ncaam')
+        const res = await fetch(apiUrl('/api/scoreboard/ncaam'))
         if (!res.ok) return
         const data = (await res.json()) as TickerGame[]
         if (!Array.isArray(data) || cancelled) return
