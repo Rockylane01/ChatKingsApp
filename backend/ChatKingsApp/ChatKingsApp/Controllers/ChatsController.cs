@@ -64,9 +64,10 @@ public class ChatsController : ControllerBase
             chat_id = chat.chat_id,
             user_id = chat.created_by_user_id,
             role = "admin",
-            points_balance = 0,
+            points_balance = 1000,
             joined_at = DateTime.UtcNow,
             is_active = true,
+            is_king = true, // first member is King by default
         };
 
         _context.ChatMembers.Add(member);
@@ -94,7 +95,7 @@ public class ChatsController : ControllerBase
             chat_id = chatId,
             user_id = userId,
             role = "member",
-            points_balance = 0,
+            points_balance = 1000,
             joined_at = DateTime.UtcNow,
             is_active = true,
         };
@@ -120,10 +121,46 @@ public class ChatsController : ControllerBase
                     cm.user_id,
                     u.username,
                     cm.points_balance,
+                    cm.is_king,
                     cm.joined_at,
                 })
             .ToListAsync();
 
         return Ok(members);
+    }
+
+    // GET api/chats/{chatId}/leaderboard
+    [HttpGet("{chatId}/leaderboard")]
+    public async Task<ActionResult> GetLeaderboard(int chatId)
+    {
+        var leaderboard = await _context.ChatMembers
+            .Where(cm => cm.chat_id == chatId && cm.is_active && cm.left_at == null)
+            .Join(
+                _context.Users,
+                cm => cm.user_id,
+                u => u.user_id,
+                (cm, u) => new
+                {
+                    cm.user_id,
+                    u.username,
+                    cm.points_balance,
+                    cm.is_king,
+                })
+            .OrderByDescending(m => m.points_balance)
+            .ToListAsync();
+
+        return Ok(leaderboard);
+    }
+
+    // GET api/chats/{chatId}/strikes?userId={userId}
+    [HttpGet("{chatId}/strikes")]
+    public async Task<ActionResult> GetStrikes(int chatId, [FromQuery] int userId)
+    {
+        var today = DateTime.UtcNow.Date;
+        var count = await _context.StrikeEvents
+            .Where(s => s.chat_id == chatId && s.user_id == userId && s.created_at >= today)
+            .SumAsync(s => s.strike_value);
+
+        return Ok(new { user_id = userId, chat_id = chatId, strikes_today = count, max_strikes = 3, locked = count >= 3 });
     }
 }

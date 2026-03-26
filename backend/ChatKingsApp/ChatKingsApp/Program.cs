@@ -43,8 +43,12 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
 builder.Services.AddHttpClient<NcaamScoreboardService>();
+builder.Services.AddHttpClient("GameResolution");
+builder.Services.AddHostedService<GameResolutionService>();
+builder.Services.AddHostedService<WeeklyResetService>();
 builder.Services.AddCors();
 builder.Services.AddDbContext<ChatKingsDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
