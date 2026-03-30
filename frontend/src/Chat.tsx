@@ -6,9 +6,17 @@ import type { User } from './types';
 type Message = {
   id: number;
   sender: string;
+  senderUserId: number;
   text: string;
   timestamp: string;
   isOwn: boolean;
+};
+
+type Member = {
+  user_id: number;
+  username: string;
+  points_balance: number;
+  is_king: boolean;
 };
 
 type Sport = 'Basketball' | 'Football';
@@ -57,6 +65,11 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const [memberNames, setMemberNames] = useState<Map<number, string>>(
     new Map()
   );
+  const [kingUsername, setKingUsername] = useState<string | null>(null);
+  const [kingUserId, setKingUserId] = useState<number | null>(null);
+  const [isCurrentUserKing, setIsCurrentUserKing] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [predictionDraft, setPredictionDraft] = useState({
     sport: 'Basketball' as Sport,
     category: 'Points' as PredictionCategory,
@@ -77,17 +90,29 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     setSubmitError(null);
   }, []);
 
-  // Fetch members for name resolution
+  // Fetch members for name resolution + king info
   useEffect(() => {
     fetch(apiUrl(`/api/chats/${chatId}/members`))
       .then((res) => res.json())
-      .then((data: Array<{ user_id: number; username: string }>) => {
+      .then((data: Member[]) => {
         const map = new Map<number, string>();
         data.forEach((m) => map.set(m.user_id, m.username));
         setMemberNames(map);
+        setMembers(data);
+
+        const king = data.find((m) => m.is_king);
+        if (king) {
+          setKingUsername(king.username);
+          setKingUserId(king.user_id);
+          setIsCurrentUserKing(king.user_id === currentUser.user_id);
+        } else {
+          setKingUsername(null);
+          setKingUserId(null);
+          setIsCurrentUserKing(false);
+        }
       })
       .catch(() => {});
-  }, [chatId]);
+  }, [chatId, currentUser.user_id]);
 
   const resolveMessage = useCallback(
     (m: {
@@ -101,6 +126,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         m.user_id === currentUser.user_id
           ? 'You'
           : (memberNames.get(m.user_id) ?? 'Unknown'),
+      senderUserId: m.user_id,
       text: m.message_text,
       timestamp: new Date(m.sent_at).toLocaleTimeString([], {
         hour: 'numeric',
@@ -260,6 +286,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       const newMessage: Message = {
         id: saved.message_id,
         sender: 'You',
+        senderUserId: currentUser.user_id,
         text: saved.message_text,
         timestamp: new Date(saved.sent_at).toLocaleTimeString([], {
           hour: 'numeric',
@@ -461,17 +488,37 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               who wears the crown.
             </p>
             <div className="chat-title-actions">
+              {isCurrentUserKing ? (
+                <button
+                  type="button"
+                  className="make-prediction-button"
+                  onClick={() => setIsPredictionOpen(true)}
+                >
+                  Make a Prediction
+                </button>
+              ) : (
+                <span className="king-only-hint">
+                  Only the Chat King can make predictions
+                </span>
+              )}
               <button
                 type="button"
-                className="make-prediction-button"
-                onClick={() => setIsPredictionOpen(true)}
+                className="members-button"
+                onClick={() => setIsMembersOpen(true)}
               >
-                Make a Prediction
+                Members ({members.length})
               </button>
             </div>
           </div>
         </div>
         <div className="chat-meta">
+          {kingUsername && (
+            <span className="chat-pill king-pill">
+              {isCurrentUserKing
+                ? 'You hold the Crown'
+                : `${kingUsername} holds the Crown`}
+            </span>
+          )}
           <span className="chat-pill live-pill">Live</span>
           <span className="chat-pill points-pill">
             Points Only · Zero Cash Risk
@@ -573,7 +620,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 )}
                 <div className="chat-message-bubble">
                   <div className="chat-message-header">
-                    <span className="chat-message-sender">{m.sender}</span>
+                    <span className="chat-message-sender">
+                      {m.sender}
+                      {m.senderUserId === kingUserId && (
+                        <svg className="crown-icon" viewBox="0 0 24 24" width="14" height="14" aria-label="Chat King">
+                          <path fill="#facc15" d="M2.5 19.5h19v2h-19v-2Zm19-11-5.5 4-4-6.5-4 6.5-5.5-4v11h19v-11Z" />
+                        </svg>
+                      )}
+                    </span>
                     <span className="chat-message-time">{m.timestamp}</span>
                   </div>
                   <p className="chat-message-text">{m.text}</p>
@@ -626,6 +680,64 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           </div>
         </aside>
       </main>
+
+      {isMembersOpen && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setIsMembersOpen(false);
+          }}
+        >
+          <div
+            className="modal-shell"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chat Members"
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">Members</h2>
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="Close"
+                onClick={() => setIsMembersOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body members-list">
+              {members.map((m) => (
+                <div
+                  key={m.user_id}
+                  className={`member-row${m.user_id === currentUser.user_id ? ' member-row-self' : ''}`}
+                >
+                  <div className="member-row-left">
+                    <div className="chat-message-avatar" style={{ width: 34, height: 34, fontSize: '0.8rem' }}>
+                      {m.username.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="member-name">
+                      {m.username}
+                      {m.user_id === currentUser.user_id && (
+                        <span className="member-you-tag"> (You)</span>
+                      )}
+                    </span>
+                    {m.is_king && (
+                      <span className="member-king-badge">
+                        <svg className="crown-icon" viewBox="0 0 24 24" width="14" height="14" aria-label="Chat King">
+                          <path fill="#facc15" d="M2.5 19.5h19v2h-19v-2Zm19-11-5.5 4-4-6.5-4 6.5-5.5-4v11h19v-11Z" />
+                        </svg>
+                        Chat King
+                      </span>
+                    )}
+                  </div>
+                  <span className="member-points">{m.points_balance} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPredictionOpen && (
         <div
