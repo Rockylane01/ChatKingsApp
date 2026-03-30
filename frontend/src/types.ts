@@ -13,6 +13,7 @@ export interface Chat {
   chat_name: string | null
   admin_id: number
   bet_permission: string
+  chat_king_user_id: number | null
   created_at: string
   updated_at: string
 }

@@ -10,6 +10,7 @@ public class Chat
     public string chat_type { get; set; } = null!;
     public int created_by_user_id { get; set; }
     public string status { get; set; } = null!;
+    public int? chat_king_user_id { get; set; }
     public DateTime created_at { get; set; }
     public DateTime updated_at { get; set; }
 }
