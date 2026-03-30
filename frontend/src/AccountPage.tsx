@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apiUrl } from './apiBase'
 import type { User } from './types'
 
 interface AccountPageProps {
@@ -31,7 +32,7 @@ export default function AccountPage({ currentUser, onUserUpdated, onGoHome, onGo
     setProfileSaving(true)
 
     try {
-      const res = await fetch(`/api/users/${currentUser.user_id}`, {
+      const res = await fetch(apiUrl(`/api/users/${currentUser.user_id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,7 +78,7 @@ export default function AccountPage({ currentUser, onUserUpdated, onGoHome, onGo
     setPasswordSaving(true)
 
     try {
-      const res = await fetch(`/api/users/${currentUser.user_id}`, {
+      const res = await fetch(apiUrl(`/api/users/${currentUser.user_id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

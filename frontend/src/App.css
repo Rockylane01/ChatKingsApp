@@ -849,8 +849,20 @@
   padding: 1rem 0.25rem;
 }
 
+.dashboard-hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 1040px;
+}
+
 .dashboard-card {
-  width: min(640px, 100%);
+  flex: 1 1 400px;
+  max-width: 640px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -863,6 +875,70 @@
     0 32px 80px rgba(0, 0, 0, 0.8),
     0 0 0 1px rgba(15, 23, 42, 0.8);
   text-align: center;
+}
+
+.okr-card {
+  flex: 0 1 300px;
+  max-width: 320px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 1.35rem 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: radial-gradient(circle at top left, #111827 0, #020617 62%);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(15, 23, 42, 0.8);
+  text-align: left;
+}
+
+.okr-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #86efac;
+}
+
+.okr-objective {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #cbd5e1;
+}
+
+.okr-value {
+  margin: 0.35rem 0 0;
+  font-size: 2.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #f9fafb;
+  font-variant-numeric: tabular-nums;
+}
+
+.okr-metric-name {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.okr-footnote {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+@media (max-width: 900px) {
+  .okr-card {
+    flex: 1 1 100%;
+    max-width: 640px;
+  }
 }
 
 .current-bets {
