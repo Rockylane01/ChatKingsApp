@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import { apiUrl } from './apiBase';
-import type { User } from './types';
+import type {
+  User,
+  TickerGame,
+  PredictionDetail,
+  PredictionOption,
+  LeaderboardEntry,
+  StrikeInfo,
+} from './types';
+
+/* ------------------------------------------------------------------ */
+/*  Local types                                                        */
+/* ------------------------------------------------------------------ */
 
 type Message = {
   id: number;
@@ -38,13 +49,15 @@ type BetResponse = {
   chat_id: number;
   game_id: number;
   user_id: number;
-  bet_category: string;
-  prediction_details_json: string;
-  points_wagered: number;
-  status: string;
-  placed_at: string;
-  resolved_at: string | null;
+  message_text: string;
+  sent_at: string;
 };
+
+type ModalStep = 'pick-game' | 'configure' | 'creator-wager';
+
+/* ------------------------------------------------------------------ */
+/*  Props                                                              */
+/* ------------------------------------------------------------------ */
 
 interface ChatProps {
   currentUser: User;
@@ -52,9 +65,46 @@ interface ChatProps {
   onBack: () => void;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatLockTime(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function parseTeamsFromMatchup(matchup: string): [string, string] {
+  // "Duke @ UNC" or "Duke vs UNC"
+  const sep = matchup.includes(' @ ') ? ' @ ' : ' vs ';
+  const parts = matchup.split(sep);
+  if (parts.length >= 2) return [parts[0].trim(), parts[1].trim()];
+  return [matchup, ''];
+}
+
+function toLocalDatetimeString(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
+  /* ---- messaging state ---- */
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [memberNames, setMemberNames] = useState<Map<number, string>>(new Map());
   const [isPredictionOpen, setIsPredictionOpen] = useState(false);
   const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(
     null
@@ -83,14 +133,41 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const lastMessageIdRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const closePrediction = useCallback(() => {
-    setIsPredictionOpen(false);
-    setPredictionTouched(false);
-    setIsEditingPrediction(false);
-    setSubmitError(null);
-  }, []);
+  /* ---- prediction state ---- */
+  const [activePrediction, setActivePrediction] = useState<PredictionDetail | null>(null);
+  const [resolvedPredictions, setResolvedPredictions] = useState<PredictionDetail[]>([]);
+  const [wagerOptionId, setWagerOptionId] = useState<number | null>(null);
+  const [wagerPoints, setWagerPoints] = useState<number>(0);
+  const [wagerError, setWagerError] = useState<string | null>(null);
+  const [showWagerForm, setShowWagerForm] = useState(false);
 
-  // Fetch members for name resolution + king info
+  /* ---- create-prediction modal state ---- */
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<ModalStep>('pick-game');
+  const [games, setGames] = useState<TickerGame[]>([]);
+  const [gamesLoading, setGamesLoading] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<TickerGame | null>(null);
+  const [isCustom, setIsCustom] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftOptionA, setDraftOptionA] = useState('');
+  const [draftOptionB, setDraftOptionB] = useState('');
+  const [draftLockAt, setDraftLockAt] = useState('');
+  const [draftBetMin, setDraftBetMin] = useState(20);
+  const [draftBetMax, setDraftBetMax] = useState(150);
+  const [creatorOptionIndex, setCreatorOptionIndex] = useState<0 | 1>(0);
+  const [creatorWagerAmount, setCreatorWagerAmount] = useState(20);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  /* ---- sidebar state ---- */
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [strikeInfo, setStrikeInfo] = useState<StrikeInfo | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  /* ================================================================ */
+  /*  Data fetching                                                    */
+  /* ================================================================ */
+
+  // Fetch member names
   useEffect(() => {
     fetch(apiUrl(`/api/chats/${chatId}/members`))
       .then((res) => res.json())
@@ -115,12 +192,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   }, [chatId, currentUser.user_id]);
 
   const resolveMessage = useCallback(
-    (m: {
-      message_id: number;
-      user_id: number;
-      message_text: string;
-      sent_at: string;
-    }) => ({
+    (m: RawMessage): Message => ({
       id: m.message_id,
       sender:
         m.user_id === currentUser.user_id
@@ -134,49 +206,31 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       }),
       isOwn: m.user_id === currentUser.user_id,
     }),
-    [currentUser.user_id, memberNames]
+    [currentUser.user_id, memberNames],
   );
 
   // Initial message fetch
   useEffect(() => {
     fetch(apiUrl(`/api/messages?chatId=${chatId}`))
       .then((res) => res.json())
-      .then(
-        (
-          data: Array<{
-            message_id: number;
-            user_id: number;
-            message_text: string;
-            sent_at: string;
-          }>
-        ) => {
-          setMessages(data.map(resolveMessage));
-          if (data.length > 0) {
-            lastMessageIdRef.current = Math.max(
-              ...data.map((m) => m.message_id)
-            );
-          }
+      .then((data: RawMessage[]) => {
+        setMessages(data.map(resolveMessage));
+        if (data.length > 0) {
+          lastMessageIdRef.current = Math.max(...data.map((m) => m.message_id));
         }
-      )
+      })
       .catch(() => {});
   }, [chatId, resolveMessage]);
 
-  // Polling for new messages every 3 seconds
+  // Poll messages every 3s
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(
-          apiUrl(
-            `/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`
-          )
+          apiUrl(`/api/messages?chatId=${chatId}&after=${lastMessageIdRef.current}`),
         );
         if (!res.ok) return;
-        const data: Array<{
-          message_id: number;
-          user_id: number;
-          message_text: string;
-          sent_at: string;
-        }> = await res.json();
+        const data: RawMessage[] = await res.json();
         if (data.length === 0) return;
 
         setMessages((prev) => {
@@ -189,74 +243,96 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
 
         lastMessageIdRef.current = Math.max(
           lastMessageIdRef.current,
-          ...data.map((m) => m.message_id)
+          ...data.map((m) => m.message_id),
         );
       } catch {
         // swallow network errors during polling
       }
     }, 3000);
-
     return () => clearInterval(interval);
   }, [chatId, resolveMessage]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  /* ---- Predictions fetching ---- */
+
+  const fetchActivePrediction = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/predictions?chatId=${chatId}&status=pending`));
+      if (!res.ok) return;
+      const data: PredictionDetail[] = await res.json();
+      setActivePrediction(data.length > 0 ? data[0] : null);
+    } catch {
+      // swallow
+    }
+  }, [chatId]);
+
+  const fetchResolvedPredictions = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/predictions?chatId=${chatId}&status=resolved`));
+      if (!res.ok) return;
+      const data: PredictionDetail[] = await res.json();
+      setResolvedPredictions(data);
+    } catch {
+      // swallow
+    }
+  }, [chatId]);
+
+  // Initial prediction fetch
   useEffect(() => {
-    fetch(apiUrl(`/api/bets?chatId=${chatId}`))
-      .then((res) => res.json())
-      .then((bets: BetResponse[]) => {
-        const pending = bets.find((b) => b.status === 'pending');
-        if (!pending) return;
-        const [sport, category] = pending.bet_category.split(':') as [
-          Sport,
-          PredictionCategory,
-        ];
-        const details = JSON.parse(pending.prediction_details_json) as {
-          text: string;
-          dueBy: string;
-          minPoints: number;
-          maxPoints: number;
-        };
-        setCurrentPrediction({
-          sport,
-          category,
-          text: details.text,
-          minPoints: details.minPoints,
-          maxPoints: details.maxPoints,
-          dueBy: details.dueBy,
-          createdAt: new Date(pending.placed_at).toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-          }),
-          createdBy: 'You',
-        });
-        setCurrentBetId(pending.bet_id);
-      })
-      .catch(() => {
-        /* backend not reachable yet */
-      });
-  }, []);
+    fetchActivePrediction();
+    fetchResolvedPredictions();
+  }, [fetchActivePrediction, fetchResolvedPredictions]);
+
+  // Poll active prediction every 5s
+  useEffect(() => {
+    const interval = setInterval(fetchActivePrediction, 5000);
+    return () => clearInterval(interval);
+  }, [fetchActivePrediction]);
+
+  /* ---- Leaderboard & Strikes fetching ---- */
+
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/chats/${chatId}/leaderboard`));
+      if (!res.ok) return;
+      const data: LeaderboardEntry[] = await res.json();
+      setLeaderboard(data);
+    } catch {
+      // swallow
+    }
+  }, [chatId]);
+
+  const fetchStrikes = useCallback(async () => {
+    try {
+      const res = await fetch(
+        apiUrl(`/api/chats/${chatId}/strikes?userId=${currentUser.user_id}`),
+      );
+      if (!res.ok) return;
+      const data: StrikeInfo = await res.json();
+      setStrikeInfo(data);
+    } catch {
+      // swallow
+    }
+  }, [chatId, currentUser.user_id]);
 
   useEffect(() => {
-    if (!isPredictionOpen) return;
+    fetchLeaderboard();
+    fetchStrikes();
+  }, [fetchLeaderboard, fetchStrikes]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closePrediction();
-    };
+  // Poll leaderboard every 10s
+  useEffect(() => {
+    const interval = setInterval(fetchLeaderboard, 10000);
+    return () => clearInterval(interval);
+  }, [fetchLeaderboard]);
 
-    const previousOverflow = document.body.style.overflow;
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-    predictionSportRef.current?.focus();
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [closePrediction, isPredictionOpen]);
+  /* ================================================================ */
+  /*  Handlers                                                         */
+  /* ================================================================ */
 
   const handleSend = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -296,153 +372,747 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       };
 
       setMessages((prev) => [...prev, newMessage]);
-      lastMessageIdRef.current = Math.max(
-        lastMessageIdRef.current,
-        saved.message_id
-      );
+      lastMessageIdRef.current = Math.max(lastMessageIdRef.current, saved.message_id);
     } catch {
       console.error('Network error sending message.');
     }
   };
 
-  const predictionErrors = (() => {
-    const errors: string[] = [];
-    if (!predictionDraft.text.trim()) errors.push('Enter a prediction.');
-    if (!predictionDraft.dueBy) errors.push('Add a bet due-by time.');
+  /* ---- Wager placement ---- */
 
-    const min = Number(predictionDraft.minPoints);
-    const max = Number(predictionDraft.maxPoints);
+  const userWager = activePrediction?.wagers?.find(
+    (w) => w.user_id === currentUser.user_id,
+  );
 
-    if (!Number.isFinite(min) || !Number.isFinite(max))
-      errors.push('Enter valid point values.');
-    if (min < 0 || max < 0) errors.push('Points must be 0 or more.');
-    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
-      errors.push(
-        'Minimum points must be less than or equal to maximum points.'
-      );
-    }
-
-    return errors;
-  })();
-
-  const canSubmitPrediction = predictionErrors.length === 0;
-
-  const handleSubmitPrediction = async (
-    e: React.SyntheticEvent<HTMLFormElement>
-  ) => {
-    e.preventDefault();
-    setPredictionTouched(true);
-    if (!canSubmitPrediction) return;
-
-    const predictionDetails = {
-      text: predictionDraft.text.trim(),
-      dueBy: predictionDraft.dueBy,
-      minPoints: Number(predictionDraft.minPoints),
-      maxPoints: Number(predictionDraft.maxPoints),
-    };
-
-    const betPayload = {
-      chat_id: chatId,
-      game_id: 1,
-      user_id: currentUser.user_id,
-      bet_category: `${predictionDraft.sport}:${predictionDraft.category}`,
-      prediction_details_json: JSON.stringify(predictionDetails),
-      points_wagered: Number(predictionDraft.minPoints),
-      status: 'pending',
-    };
+  const handlePlaceWager = async () => {
+    if (!activePrediction || wagerOptionId === null) return;
+    setWagerError(null);
 
     try {
-      let res: Response;
-      if (isEditingPrediction && currentBetId !== null) {
-        res = await fetch(apiUrl(`/api/bets/${currentBetId}`), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...betPayload, bet_id: currentBetId }),
-        });
-      } else {
-        res = await fetch(apiUrl('/api/bets'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(betPayload),
-        });
-      }
+      const res = await fetch(apiUrl(`/api/predictions/${activePrediction.prediction_id}/wager`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.user_id,
+          option_id: wagerOptionId,
+          points_wagered: wagerPoints,
+        }),
+      });
 
       if (!res.ok) {
-        const msg = await res.text();
-        setSubmitError(msg || 'Failed to save bet.');
+        const text = await res.text();
+        setWagerError(text || 'Failed to place wager.');
         return;
       }
 
-      const saved: BetResponse = await res.json();
-      const [sport, category] = saved.bet_category.split(':') as [
-        Sport,
-        PredictionCategory,
-      ];
-      const details = JSON.parse(saved.prediction_details_json);
-
-      setCurrentPrediction({
-        sport,
-        category,
-        text: details.text,
-        minPoints: details.minPoints,
-        maxPoints: details.maxPoints,
-        dueBy: details.dueBy,
-        createdAt: new Date(saved.placed_at).toLocaleTimeString([], {
-          hour: 'numeric',
-          minute: '2-digit',
-        }),
-        createdBy:
-          saved.user_id === currentUser.user_id
-            ? 'You'
-            : (memberNames.get(saved.user_id) ?? 'Unknown'),
-      });
-      setCurrentBetId(saved.bet_id);
-      closePrediction();
-      setPredictionDraft((prev) => ({ ...prev, text: '', dueBy: '' }));
+      setShowWagerForm(false);
+      setWagerOptionId(null);
+      setWagerPoints(0);
+      await fetchActivePrediction();
     } catch {
-      setSubmitError('Network error. Please try again.');
+      setWagerError('Network error. Please try again.');
     }
   };
 
-  const formatDueBy = (dueBy: string) => {
-    const parsed = new Date(dueBy);
-    if (!Number.isFinite(parsed.getTime())) return dueBy;
-    return parsed.toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+  /* ---- Delete / Edit active prediction ---- */
 
   const handleDeletePrediction = async () => {
-    if (currentBetId !== null) {
-      try {
-        await fetch(apiUrl(`/api/bets/${currentBetId}`), {
-          method: 'DELETE',
-        });
-      } catch {
-        // best-effort delete; clear locally regardless
-      }
+    if (!activePrediction) return;
+    try {
+      await fetch(apiUrl(`/api/predictions/${activePrediction.prediction_id}`), {
+        method: 'DELETE',
+      });
+    } catch {
+      // best-effort
     }
-    setCurrentPrediction(null);
-    setCurrentBetId(null);
+    setActivePrediction(null);
   };
 
   const handleEditPrediction = () => {
-    if (!currentPrediction) return;
-    setPredictionDraft({
-      sport: currentPrediction.sport,
-      category: currentPrediction.category,
-      text: currentPrediction.text,
-      minPoints: currentPrediction.minPoints,
-      maxPoints: currentPrediction.maxPoints,
-      dueBy: currentPrediction.dueBy,
-    });
-    setPredictionTouched(false);
-    setIsEditingPrediction(true);
-    setIsPredictionOpen(true);
+    if (!activePrediction) return;
+    // Open modal in configure step with current values pre-filled
+    setIsCustom(true);
+    setSelectedGame(null);
+    setDraftTitle(activePrediction.title);
+    const opts = activePrediction.options;
+    setDraftOptionA(opts[0]?.option_label ?? '');
+    setDraftOptionB(opts[1]?.option_label ?? '');
+    setDraftLockAt(activePrediction.lock_at ? toLocalDatetimeString(activePrediction.lock_at) : '');
+    setDraftBetMin(activePrediction.initial_bet_min);
+    setDraftBetMax(activePrediction.initial_bet_max);
+    setModalStep('configure');
+    setModalError(null);
+    setIsModalOpen(true);
   };
+
+  /* ---- Create Prediction Modal ---- */
+
+  const openCreateModal = () => {
+    setSelectedGame(null);
+    setIsCustom(false);
+    setDraftTitle('');
+    setDraftOptionA('');
+    setDraftOptionB('');
+    setDraftLockAt('');
+    setDraftBetMin(20);
+    setDraftBetMax(150);
+    setCreatorOptionIndex(0);
+    setCreatorWagerAmount(20);
+    setModalStep('pick-game');
+    setModalError(null);
+    setIsModalOpen(true);
+
+    // Fetch games
+    setGamesLoading(true);
+    fetch(apiUrl('/api/scoreboard/ncaam'))
+      .then((res) => res.json())
+      .then((data: TickerGame[]) => setGames(data))
+      .catch(() => setGames([]))
+      .finally(() => setGamesLoading(false));
+  };
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setModalError(null);
+  }, []);
+
+  // Escape key and body scroll lock for modal
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+
+    const prevOverflow = document.body.style.overflow;
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isModalOpen, closeModal]);
+
+  const handleSelectGame = (game: TickerGame) => {
+    setSelectedGame(game);
+    setIsCustom(false);
+    const [teamA, teamB] = parseTeamsFromMatchup(game.matchup);
+    setDraftTitle(`Who wins: ${game.matchup}?`);
+    setDraftOptionA(teamA);
+    setDraftOptionB(teamB);
+    // Try to use the game status as a lock hint; default empty
+    setDraftLockAt('');
+    setModalStep('configure');
+  };
+
+  const handleSelectCustom = () => {
+    setSelectedGame(null);
+    setIsCustom(true);
+    setDraftTitle('');
+    setDraftOptionA('');
+    setDraftOptionB('');
+    setDraftLockAt('');
+    setModalStep('configure');
+  };
+
+  const handleConfigureNext = () => {
+    if (!draftTitle.trim() || !draftOptionA.trim() || !draftOptionB.trim()) {
+      setModalError('Fill in the prediction title and both options.');
+      return;
+    }
+    if (draftBetMin <= 0 || draftBetMax <= 0 || draftBetMin > draftBetMax) {
+      setModalError('Enter valid bet min/max values.');
+      return;
+    }
+    setModalError(null);
+    setCreatorWagerAmount(draftBetMin);
+    setModalStep('creator-wager');
+  };
+
+  const handleSubmitPrediction = async () => {
+    if (creatorWagerAmount < draftBetMin || creatorWagerAmount > draftBetMax) {
+      setModalError(`Wager must be between ${draftBetMin} and ${draftBetMax}.`);
+      return;
+    }
+    setModalError(null);
+
+    const payload = {
+      chat_id: chatId,
+      user_id: currentUser.user_id,
+      title: draftTitle.trim(),
+      espn_event_id: selectedGame?.id ?? null,
+      lock_at: draftLockAt ? new Date(draftLockAt).toISOString() : null,
+      initial_bet_min: draftBetMin,
+      initial_bet_max: draftBetMax,
+      options: [
+        { option_label: draftOptionA.trim(), team_id: null, display_order: 1 },
+        { option_label: draftOptionB.trim(), team_id: null, display_order: 2 },
+      ],
+      creator_wager: {
+        option_index: creatorOptionIndex,
+        points_wagered: creatorWagerAmount,
+      },
+    };
+
+    try {
+      const res = await fetch(apiUrl('/api/predictions'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        setModalError(text || 'Failed to create prediction.');
+        return;
+      }
+
+      closeModal();
+      await fetchActivePrediction();
+    } catch {
+      setModalError('Network error. Please try again.');
+    }
+  };
+
+  /* ================================================================ */
+  /*  Derived data                                                     */
+  /* ================================================================ */
+
+  const myLeaderboardEntry = leaderboard.find((e) => e.user_id === currentUser.user_id);
+
+  /* ================================================================ */
+  /*  Render helpers                                                   */
+  /* ================================================================ */
+
+  const renderPredictionBanner = () => {
+    if (!activePrediction) return null;
+
+    const isCreator = activePrediction.created_by_user_id === currentUser.user_id;
+    const isLocked =
+      activePrediction.lock_at && new Date(activePrediction.lock_at) <= new Date();
+
+    return (
+      <div className="prediction-banner" role="status" aria-live="polite">
+        <div className="prediction-banner-top">
+          <span className="prediction-badge">Current Prediction</span>
+          <div className="prediction-right">
+            {activePrediction.lock_at && (
+              <span className="prediction-meta">
+                Locks at {formatLockTime(activePrediction.lock_at)}
+              </span>
+            )}
+            {isCreator && (
+              <div className="prediction-actions" aria-label="Prediction actions">
+                <button
+                  type="button"
+                  className="prediction-icon-button"
+                  onClick={handleEditPrediction}
+                  aria-label="Edit prediction"
+                  title="Edit"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M16.862 3.487a2.25 2.25 0 0 1 3.182 3.182l-9.94 9.94a2.25 2.25 0 0 1-.953.57l-3.25 1.083a.75.75 0 0 1-.949-.949l1.083-3.25a2.25 2.25 0 0 1 .57-.953l9.94-9.94Z"
+                    />
+                  </svg>
+                  <span className="prediction-action-text">Edit</span>
+                </button>
+                <button
+                  type="button"
+                  className="prediction-icon-button danger"
+                  onClick={handleDeletePrediction}
+                  aria-label="Delete prediction"
+                  title="Delete"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M9 3.75A2.25 2.25 0 0 1 11.25 1.5h1.5A2.25 2.25 0 0 1 15 3.75V5h4.5a.75.75 0 0 1 0 1.5H18.2l-1.02 14.02A2.25 2.25 0 0 1 14.94 22.5H9.06a2.25 2.25 0 0 1-2.24-1.98L5.8 6.5H4.5a.75.75 0 0 1 0-1.5H9V3.75Z"
+                    />
+                  </svg>
+                  <span className="prediction-action-text">Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="prediction-banner-body">
+          <p className="prediction-text">{activePrediction.title}</p>
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem' }}>
+            {activePrediction.options.map((opt) => {
+              const isUserChoice = userWager?.option_id === opt.option_id;
+              return (
+                <div
+                  key={opt.option_id}
+                  className={`prediction-option-card${isUserChoice ? ' prediction-option-selected' : ''}`}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {opt.option_label}
+                    {isUserChoice && ' \u2713'}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
+                    {opt.total_wagered} pts wagered &middot; {opt.wager_count} bettor
+                    {opt.wager_count !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Wager form — only if user hasn't wagered and not locked */}
+          {!userWager && !isLocked && (
+            <div style={{ marginTop: '0.75rem' }}>
+              {!showWagerForm ? (
+                <button
+                  type="button"
+                  className="make-prediction-button"
+                  style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+                  onClick={() => {
+                    setShowWagerForm(true);
+                    setWagerPoints(activePrediction.initial_bet_min);
+                    setWagerOptionId(activePrediction.options[0]?.option_id ?? null);
+                  }}
+                >
+                  Place Wager
+                </button>
+              ) : (
+                <div className="wager-form">
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {activePrediction.options.map((opt) => (
+                      <label key={opt.option_id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="wager-option"
+                          checked={wagerOptionId === opt.option_id}
+                          onChange={() => setWagerOptionId(opt.option_id)}
+                        />
+                        {opt.option_label}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                    <input
+                      type="number"
+                      className="wager-input"
+                      min={activePrediction.initial_bet_min}
+                      max={activePrediction.initial_bet_max}
+                      value={wagerPoints}
+                      onChange={(e) => setWagerPoints(Number(e.target.value))}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                      ({activePrediction.initial_bet_min}–{activePrediction.initial_bet_max} pts)
+                    </span>
+                    <button
+                      type="button"
+                      className="modal-primary-button"
+                      style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                      onClick={handlePlaceWager}
+                    >
+                      Submit
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-secondary-button"
+                      style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                      onClick={() => {
+                        setShowWagerForm(false);
+                        setWagerError(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {wagerError && (
+                    <div className="modal-error" role="alert" style={{ marginTop: '0.4rem' }}>
+                      {wagerError}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="prediction-range" style={{ marginTop: '0.5rem' }}>
+            Bet range: <strong>{activePrediction.initial_bet_min}</strong>–
+            <strong>{activePrediction.initial_bet_max}</strong> pts
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSidebar = () => (
+    <aside className="chat-sidebar">
+      {/* Leaderboard */}
+      <div className="sidebar-card">
+        <h2>Leaderboard</h2>
+        {leaderboard.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>No data yet.</p>
+        ) : (
+          <div className="leaderboard-list">
+            {leaderboard.map((entry, idx) => {
+              const isMe = entry.user_id === currentUser.user_id;
+              return (
+                <div
+                  key={entry.user_id}
+                  className={`leaderboard-row${entry.is_king ? ' leaderboard-king' : ''}${isMe ? ' leaderboard-me' : ''}`}
+                >
+                  <span style={{ width: '1.5rem', textAlign: 'right', marginRight: '0.5rem' }}>
+                    {idx + 1}.
+                  </span>
+                  <span style={{ flex: 1 }}>
+                    {entry.is_king && '\uD83D\uDC51 '}
+                    {entry.username}
+                    {isMe && ' (You)'}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>{entry.points_balance} pts</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Your Stats */}
+      <div className="sidebar-card">
+        <h3>Your Stats</h3>
+        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+          Points: <strong>{myLeaderboardEntry?.points_balance ?? '—'}</strong>
+        </p>
+        {strikeInfo && (
+          <div>
+            <p style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>Strikes:</p>
+            <div className="strike-dots">
+              {Array.from({ length: strikeInfo.max_strikes }).map((_, i) => {
+                const used = i < strikeInfo.strikes_today;
+                const colors = ['#eab308', '#f97316', '#ef4444'];
+                return (
+                  <span
+                    key={i}
+                    className={`strike-dot${used ? ' strike-dot-used' : ''}`}
+                    style={used ? { backgroundColor: colors[i] ?? '#ef4444' } : undefined}
+                  />
+                );
+              })}
+            </div>
+            {strikeInfo.locked && (
+              <p style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.3rem' }}>
+                Locked out — max strikes reached.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Prediction History */}
+      <div className="sidebar-card">
+        <h3
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setHistoryOpen((v) => !v)}
+        >
+          Prediction History {historyOpen ? '\u25B2' : '\u25BC'}
+        </h3>
+        {historyOpen && (
+          <div className="prediction-history">
+            {resolvedPredictions.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>No resolved predictions.</p>
+            ) : (
+              resolvedPredictions.map((pred) => {
+                const winningOptId = pred.resolution?.winning_option_id;
+                const winningOpt = pred.options.find((o) => o.option_id === winningOptId);
+                const myWager = pred.wagers?.find((w) => w.user_id === currentUser.user_id);
+                const didWin = myWager && myWager.option_id === winningOptId;
+                const didLose = myWager && myWager.option_id !== winningOptId;
+
+                return (
+                  <div key={pred.prediction_id} className="prediction-history-item">
+                    <div style={{ fontWeight: 500 }}>{pred.title}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                      Winner: {winningOpt?.option_label ?? '—'}
+                    </div>
+                    {myWager && (
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: didWin ? '#22c55e' : didLose ? '#ef4444' : '#9ca3af',
+                        }}
+                      >
+                        {didWin ? 'Won' : didLose ? 'Lost' : '—'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+
+  const renderModal = () => {
+    if (!isModalOpen) return null;
+
+    return (
+      <div
+        className="modal-overlay"
+        role="presentation"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) closeModal();
+        }}
+      >
+        <div className="modal-shell" role="dialog" aria-modal="true" aria-label="Make a Prediction">
+          <div className="modal-header">
+            <h2 className="modal-title">Make a Prediction</h2>
+            <button
+              type="button"
+              className="modal-close-button"
+              aria-label="Close"
+              onClick={closeModal}
+            >
+              &times;
+            </button>
+          </div>
+
+          <div className="modal-body">
+            {/* Step 1: Pick a Game */}
+            {modalStep === 'pick-game' && (
+              <div className="modal-step">
+                <h3 className="modal-step-title">Step 1: Pick a Game</h3>
+                {gamesLoading ? (
+                  <p style={{ color: '#9ca3af' }}>Loading games...</p>
+                ) : (
+                  <div className="game-picker">
+                    {games.map((game) => (
+                      <div
+                        key={game.id}
+                        className={`game-card${selectedGame?.id === game.id ? ' game-card-selected' : ''}`}
+                        onClick={() => handleSelectGame(game)}
+                      >
+                        <div style={{ fontWeight: 600 }}>{game.matchup}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                          {game.status}
+                          {game.score ? ` — ${game.score}` : ''}
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      className={`game-card${isCustom ? ' game-card-selected' : ''}`}
+                      onClick={handleSelectCustom}
+                    >
+                      <div style={{ fontWeight: 600 }}>Custom Prediction</div>
+                      <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                        Type your own question
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: Configure Prediction */}
+            {modalStep === 'configure' && (
+              <div className="modal-step">
+                <h3 className="modal-step-title">Step 2: Configure Prediction</h3>
+
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="pred-title">
+                    Prediction Title
+                  </label>
+                  <input
+                    id="pred-title"
+                    type="text"
+                    className="modal-control"
+                    placeholder="E.g., Who wins: Duke vs UNC?"
+                    value={draftTitle}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                  />
+                </div>
+
+                <div className="modal-grid">
+                  <div className="modal-row">
+                    <label className="modal-label" htmlFor="pred-opt-a">
+                      Option A
+                    </label>
+                    <input
+                      id="pred-opt-a"
+                      type="text"
+                      className="modal-control"
+                      placeholder="E.g., Duke"
+                      value={draftOptionA}
+                      onChange={(e) => setDraftOptionA(e.target.value)}
+                    />
+                  </div>
+                  <div className="modal-row">
+                    <label className="modal-label" htmlFor="pred-opt-b">
+                      Option B
+                    </label>
+                    <input
+                      id="pred-opt-b"
+                      type="text"
+                      className="modal-control"
+                      placeholder="E.g., UNC"
+                      value={draftOptionB}
+                      onChange={(e) => setDraftOptionB(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="pred-lock">
+                    Lock Time
+                  </label>
+                  <input
+                    id="pred-lock"
+                    type="datetime-local"
+                    className="modal-control"
+                    value={draftLockAt}
+                    onChange={(e) => setDraftLockAt(e.target.value)}
+                  />
+                </div>
+
+                <div className="modal-grid">
+                  <div className="modal-row">
+                    <label className="modal-label" htmlFor="pred-min">
+                      Min Bet (pts)
+                    </label>
+                    <input
+                      id="pred-min"
+                      type="number"
+                      className="modal-control"
+                      min={1}
+                      value={draftBetMin}
+                      onChange={(e) => setDraftBetMin(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="modal-row">
+                    <label className="modal-label" htmlFor="pred-max">
+                      Max Bet (pts)
+                    </label>
+                    <input
+                      id="pred-max"
+                      type="number"
+                      className="modal-control"
+                      min={1}
+                      value={draftBetMax}
+                      onChange={(e) => setDraftBetMax(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+
+                {modalError && (
+                  <div className="modal-error" role="alert">
+                    {modalError}
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="modal-secondary-button"
+                    onClick={() => {
+                      setModalError(null);
+                      setModalStep('pick-game');
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-primary-button"
+                    onClick={handleConfigureNext}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Creator's Wager */}
+            {modalStep === 'creator-wager' && (
+              <div className="modal-step">
+                <h3 className="modal-step-title">Step 3: Your Wager</h3>
+                <p style={{ marginBottom: '0.75rem', color: '#d1d5db' }}>
+                  As the creator, pick your side and place your wager.
+                </p>
+
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="creator-pick"
+                      checked={creatorOptionIndex === 0}
+                      onChange={() => setCreatorOptionIndex(0)}
+                    />
+                    {draftOptionA}
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="creator-pick"
+                      checked={creatorOptionIndex === 1}
+                      onChange={() => setCreatorOptionIndex(1)}
+                    />
+                    {draftOptionB}
+                  </label>
+                </div>
+
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="creator-wager-amt">
+                    Wager Amount ({draftBetMin}–{draftBetMax} pts)
+                  </label>
+                  <input
+                    id="creator-wager-amt"
+                    type="number"
+                    className="modal-control"
+                    min={draftBetMin}
+                    max={draftBetMax}
+                    value={creatorWagerAmount}
+                    onChange={(e) => setCreatorWagerAmount(Number(e.target.value))}
+                  />
+                </div>
+
+                {modalError && (
+                  <div className="modal-error" role="alert">
+                    {modalError}
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="modal-secondary-button"
+                    onClick={() => {
+                      setModalError(null);
+                      setModalStep('configure');
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-primary-button"
+                    onClick={handleSubmitPrediction}
+                  >
+                    Create Prediction
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* ================================================================ */
+  /*  Main render                                                      */
+  /* ================================================================ */
 
   return (
     <div className="chat-page">
@@ -484,8 +1154,8 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           <div>
             <h1 className="chat-title">Your Team Chat</h1>
             <p className="chat-subtitle">
-              Squad up with real friends, place friendly point bets, and track
-              who wears the crown.
+              Squad up with real friends, place friendly point bets, and track who wears
+              the crown.
             </p>
             <div className="chat-title-actions">
               {isCurrentUserKing ? (
@@ -503,8 +1173,8 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               )}
               <button
                 type="button"
-                className="members-button"
-                onClick={() => setIsMembersOpen(true)}
+                className="make-prediction-button"
+                onClick={openCreateModal}
               >
                 Members ({members.length})
               </button>
@@ -520,93 +1190,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
             </span>
           )}
           <span className="chat-pill live-pill">Live</span>
-          <span className="chat-pill points-pill">
-            Points Only · Zero Cash Risk
-          </span>
+          <span className="chat-pill points-pill">Points Only &middot; Zero Cash Risk</span>
         </div>
       </header>
 
       <main className="chat-layout">
         <section className="chat-panel">
-          {currentPrediction && (
-            <div className="prediction-banner" role="status" aria-live="polite">
-              <div className="prediction-banner-top">
-                <span className="prediction-badge">Current Prediction</span>
-                <div className="prediction-right">
-                  <span className="prediction-meta">
-                    {currentPrediction.sport} · {currentPrediction.category} ·
-                    Bet due by {formatDueBy(currentPrediction.dueBy)}
-                  </span>
-                  {currentPrediction.createdBy === 'You' && (
-                    <div
-                      className="prediction-actions"
-                      aria-label="Prediction actions"
-                    >
-                      <button
-                        type="button"
-                        className="prediction-icon-button"
-                        onClick={handleEditPrediction}
-                        aria-label="Edit prediction"
-                        title="Edit"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="18"
-                          height="18"
-                          aria-hidden="true"
-                          focusable="false"
-                        >
-                          <path
-                            fill="currentColor"
-                            d="M16.862 3.487a2.25 2.25 0 0 1 3.182 3.182l-9.94 9.94a2.25 2.25 0 0 1-.953.57l-3.25 1.083a.75.75 0 0 1-.949-.949l1.083-3.25a2.25 2.25 0 0 1 .57-.953l9.94-9.94Zm2.121 1.061a.75.75 0 0 0-1.06 0l-.88.879 1.06 1.061.88-.88a.75.75 0 0 0 0-1.06ZM16.0 7.55l-8.84 8.84a.75.75 0 0 0-.19.317l-.61 1.83 1.83-.61a.75.75 0 0 0 .317-.19l8.84-8.84L16 7.55Z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M4.5 20.25A1.5 1.5 0 0 1 3 18.75V9A1.5 1.5 0 0 1 4.5 7.5h6a.75.75 0 0 1 0 1.5h-6v9.75h9.75v-6a.75.75 0 0 1 1.5 0v6a1.5 1.5 0 0 1-1.5 1.5H4.5Z"
-                            opacity="0.35"
-                          />
-                        </svg>
-                        <span className="prediction-action-text">Edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="prediction-icon-button danger"
-                        onClick={handleDeletePrediction}
-                        aria-label="Delete prediction"
-                        title="Delete"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="18"
-                          height="18"
-                          aria-hidden="true"
-                          focusable="false"
-                        >
-                          <path
-                            fill="currentColor"
-                            d="M9 3.75A2.25 2.25 0 0 1 11.25 1.5h1.5A2.25 2.25 0 0 1 15 3.75V5h4.5a.75.75 0 0 1 0 1.5H18.2l-1.02 14.02A2.25 2.25 0 0 1 14.94 22.5H9.06a2.25 2.25 0 0 1-2.24-1.98L5.8 6.5H4.5a.75.75 0 0 1 0-1.5H9V3.75Zm1.5 0V5h3V3.75a.75.75 0 0 0-.75-.75h-1.5a.75.75 0 0 0-.75.75Z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M9.75 10.5a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Zm4.5 0a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Z"
-                            opacity="0.8"
-                          />
-                        </svg>
-                        <span className="prediction-action-text">Delete</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="prediction-banner-body">
-                <p className="prediction-text">{currentPrediction.text}</p>
-                <div className="prediction-range">
-                  Bet range: <strong>{currentPrediction.minPoints}</strong>–
-                  <strong>{currentPrediction.maxPoints}</strong> pts
-                </div>
-              </div>
-            </div>
-          )}
+          {renderPredictionBanner()}
+
           <div className="chat-messages">
             {messages.map((m) => (
               <div
@@ -614,9 +1205,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 className={`chat-message-row ${m.isOwn ? 'own' : 'other'}`}
               >
                 {!m.isOwn && (
-                  <div className="chat-message-avatar">
-                    {m.sender.charAt(0)}
-                  </div>
+                  <div className="chat-message-avatar">{m.sender.charAt(0)}</div>
                 )}
                 <div className="chat-message-bubble">
                   <div className="chat-message-header">
@@ -655,32 +1244,10 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           </form>
         </section>
 
-        <aside className="chat-sidebar">
-          <div className="sidebar-card">
-            <h2>Team Focus</h2>
-            <p>
-              This is your private team locker room. Spin up friendly point
-              bets, call your picks, and keep the sweat fun without touching
-              real money.
-            </p>
-          </div>
-          <div className="sidebar-card">
-            <h3>How Your Team Uses Points</h3>
-            <ul>
-              <li>Place head-to-head or squad bets in points, never cash.</li>
-              <li>
-                Set fun stakes: bragging rights, snacks, or picking next
-                week&apos;s game.
-              </li>
-              <li>
-                Track who&apos;s hot and who&apos;s on a cold streak — all
-                inside ChatKings.
-              </li>
-            </ul>
-          </div>
-        </aside>
+        {renderSidebar()}
       </main>
 
+      {renderModal()}
       {isMembersOpen && (
         <div
           className="modal-overlay"

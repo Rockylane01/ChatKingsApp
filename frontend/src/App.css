@@ -1373,6 +1373,299 @@
   min-width: 200px;
 }
 
+/* Game Picker */
+
+.game-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.game-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(55, 65, 81, 0.85);
+  background: rgba(15, 23, 42, 0.6);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+  text-align: left;
+}
+
+.game-card:hover {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.game-card-selected {
+  border-color: rgba(52, 211, 153, 0.85);
+  background: rgba(6, 95, 70, 0.2);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.5);
+}
+
+.game-card-matchup {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.game-card-info {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+/* Prediction Option Cards */
+
+.prediction-options-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.prediction-option-card {
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(55, 65, 81, 0.85);
+  background: rgba(15, 23, 42, 0.6);
+  text-align: center;
+  transition: border-color 0.12s ease;
+}
+
+.prediction-option-card.prediction-option-selected {
+  border-color: rgba(52, 211, 153, 0.85);
+  background: rgba(6, 95, 70, 0.2);
+}
+
+.prediction-option-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f9fafb;
+}
+
+.prediction-option-stats {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+.prediction-option-check {
+  color: #86efac;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+}
+
+/* Wager Form */
+
+.wager-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: rgba(6, 95, 70, 0.1);
+  margin-top: 0.5rem;
+}
+
+.wager-options {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.wager-option-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.wager-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wager-input {
+  width: 100px;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(75, 85, 99, 0.9);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.wager-input:focus {
+  border-color: rgba(52, 211, 153, 0.85);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.7);
+}
+
+.wager-range-hint {
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+/* Leaderboard */
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  color: #d1d5db;
+}
+
+.leaderboard-row-self {
+  background: rgba(6, 95, 70, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.leaderboard-rank {
+  font-weight: 700;
+  color: #9ca3af;
+  width: 1.5rem;
+  text-align: center;
+}
+
+.leaderboard-name {
+  flex: 1;
+  margin-left: 0.4rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.leaderboard-king {
+  margin-left: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.leaderboard-points {
+  font-weight: 700;
+  color: #86efac;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Strike Dots */
+
+.strike-dots {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.strike-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(107, 114, 128, 0.6);
+  background: transparent;
+}
+
+.strike-dot-1 {
+  border-color: #facc15;
+  background: #facc15;
+}
+
+.strike-dot-2 {
+  border-color: #f97316;
+  background: #f97316;
+}
+
+.strike-dot-3 {
+  border-color: #ef4444;
+  background: #ef4444;
+}
+
+/* Prediction History */
+
+.prediction-history {
+  margin-top: 0.5rem;
+}
+
+.prediction-history-toggle {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  text-decoration: underline;
+}
+
+.prediction-history-toggle:hover {
+  color: #e5e7eb;
+}
+
+.prediction-history-list {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.prediction-history-item {
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.6rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  font-size: 0.78rem;
+  color: #d1d5db;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.prediction-history-won {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.prediction-history-lost {
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+/* Modal Steps */
+
+.modal-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.modal-step-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(134, 239, 172, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modal-step-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
 /* Responsive */
 
 @media (max-width: 960px) {

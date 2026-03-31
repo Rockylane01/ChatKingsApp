@@ -15,6 +15,7 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newChatName, setNewChatName] = useState('')
+  const [newChatTimezone, setNewChatTimezone] = useState('America/New_York')
   const [createError, setCreateError] = useState('')
   const [joiningId, setJoiningId] = useState<number | null>(null)
 
@@ -59,6 +60,7 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
           chat_type: 'group',
           created_by_user_id: currentUser.user_id,
           status: 'active',
+          timezone: newChatTimezone,
         }),
       })
 
@@ -142,6 +144,16 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
             onChange={(e) => setNewChatName(e.target.value)}
             autoFocus
           />
+          <select
+            className="modal-control"
+            value={newChatTimezone}
+            onChange={(e) => setNewChatTimezone(e.target.value)}
+          >
+            <option value="America/New_York">Eastern (ET)</option>
+            <option value="America/Chicago">Central (CT)</option>
+            <option value="America/Denver">Mountain (MT)</option>
+            <option value="America/Los_Angeles">Pacific (PT)</option>
+          </select>
           {createError && <div className="modal-error">{createError}</div>}
           <button type="submit" className="modal-primary-button" style={{ padding: '0.5rem 1.5rem' }}>
             Create Chat
