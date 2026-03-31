@@ -3,6 +3,7 @@ using System;
 using ChatKingsApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ChatKingsApp.Migrations
 {
     [DbContext(typeof(ChatKingsDbContext))]
-    partial class ChatKingsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260330161744_AddChatKingColumn")]
+    partial class AddChatKingColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -40,10 +43,6 @@ namespace ChatKingsApp.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("timezone")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -91,9 +90,6 @@ namespace ChatKingsApp.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("is_active")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("is_king")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("joined_at")
@@ -361,16 +357,7 @@ namespace ChatKingsApp.Migrations
                     b.Property<string>("description")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("espn_event_id")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("game_id")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("initial_bet_max")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("initial_bet_min")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("lock_at")

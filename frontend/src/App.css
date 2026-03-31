@@ -176,6 +176,95 @@
   border-color: rgba(52, 211, 153, 0.55);
 }
 
+.king-pill {
+  border-color: rgba(250, 204, 21, 0.7);
+  color: #fde68a;
+  font-weight: 600;
+}
+
+/* Crown icon in messages */
+.crown-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 3px;
+}
+
+/* Members button */
+.members-button {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #e5e7eb;
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.members-button:hover {
+  border-color: rgba(148, 163, 184, 0.7);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* Members list modal */
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 !important;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+.member-row:last-child {
+  border-bottom: none;
+}
+.member-row-self {
+  background: rgba(99, 102, 241, 0.08);
+}
+.member-row-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.member-name {
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  font-weight: 500;
+}
+.member-you-tag {
+  color: #9ca3af;
+  font-weight: 400;
+}
+.member-king-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: #fde68a;
+  font-weight: 600;
+  margin-left: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  background: rgba(250, 204, 21, 0.08);
+}
+.member-points {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+}
+
+/* King-only hint for non-king users */
+.king-only-hint {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+
 .chat-layout {
   display: grid;
   grid-template-columns: 2.2fr 1fr;
@@ -981,6 +1070,13 @@
   gap: 0.55rem;
 }
 
+.current-bets-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #9ca3af;
+  padding: 0.35rem 0.1rem 0.1rem;
+}
+
 .current-bet-card {
   border-radius: 0.85rem;
   border: 1px solid rgba(55, 65, 81, 0.8);
@@ -1019,6 +1115,21 @@
 .current-bet-status.pending {
   border-color: rgba(250, 204, 21, 0.55);
   color: #fde68a;
+}
+
+.current-bet-status.won {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #a7f3d0;
+}
+
+.current-bet-status.lost {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.current-bet-status.cancelled {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: #cbd5e1;
 }
 
 .current-bet-matchup {

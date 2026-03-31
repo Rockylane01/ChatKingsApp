@@ -68,6 +68,13 @@ public class BetsController : ControllerBase
         if (!ValidStatuses.Contains(req.status))
             return BadRequest($"Invalid status '{req.status}'. Must be one of: {string.Join(", ", ValidStatuses)}.");
 
+        // Only the Chat King can create predictions
+        var chat = await _context.Chats.FindAsync(req.chat_id);
+        if (chat is null)
+            return BadRequest("Chat not found.");
+        if (chat.chat_king_user_id != req.user_id)
+            return StatusCode(403, "Only the Chat King can create predictions.");
+
         var validationError = ValidatePredictionPayload(req.bet_category, req.prediction_details_json);
         if (validationError != null)
             return BadRequest(validationError);

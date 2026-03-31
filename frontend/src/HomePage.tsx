@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiUrl } from './apiBase'
-import type { TickerGame, User } from './types'
+import type { Chat, TickerGame, User } from './types'
 
 interface HomePageProps {
   currentUser: User
@@ -9,34 +9,31 @@ interface HomePageProps {
   onLogout: () => void
 }
 
-const currentBets = [
-  {
-    id: 1,
-    friend: 'Mason',
-    matchup: 'Lakers vs Warriors',
-    pick: 'Lakers -4.5',
-    points: 25,
-    status: 'Pending',
-  },
-  {
-    id: 2,
-    friend: 'Ava',
-    matchup: 'Chiefs vs Bills',
-    pick: 'Over 48.5',
-    points: 15,
-    status: 'Winning',
-  },
-  {
-    id: 3,
-    friend: 'Jordan',
-    matchup: 'Yankees vs Red Sox',
-    pick: 'Red Sox ML',
-    points: 20,
-    status: 'Pending',
-  },
-]
-
 type WagersTotalResponse = { totalWagers?: number }
+type BetResponse = {
+  bet_id: number
+  chat_id: number
+  user_id: number
+  bet_category: string
+  prediction_details_json: string
+  points_wagered: number
+  status: string
+  placed_at: string
+}
+type ParsedBetDetails = {
+  text?: string
+  dueBy?: string
+  minPoints?: number
+  maxPoints?: number
+}
+type HomeBet = {
+  id: number
+  chatName: string
+  category: string
+  pick: string
+  points: number
+  status: string
+}
 
 export default function HomePage({
   currentUser,
@@ -46,6 +43,8 @@ export default function HomePage({
 }: HomePageProps) {
   const [tickerGames, setTickerGames] = useState<TickerGame[]>([])
   const [totalWagers, setTotalWagers] = useState<number | null>(null)
+  const [currentBets, setCurrentBets] = useState<HomeBet[]>([])
+  const [betsLoading, setBetsLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -69,7 +68,7 @@ export default function HomePage({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/stats/wagers-total')
+        const res = await fetch(apiUrl('/api/stats/wagers-total'))
         if (!res.ok) return
         const data = (await res.json()) as WagersTotalResponse
         if (cancelled || typeof data.totalWagers !== 'number') return
@@ -82,6 +81,76 @@ export default function HomePage({
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setBetsLoading(true)
+      try {
+        const chatsRes = await fetch(apiUrl(`/api/chats?userId=${currentUser.user_id}`))
+        if (!chatsRes.ok) {
+          if (!cancelled) setCurrentBets([])
+          return
+        }
+
+        const chats = (await chatsRes.json()) as Chat[]
+        if (!Array.isArray(chats) || chats.length === 0) {
+          if (!cancelled) setCurrentBets([])
+          return
+        }
+
+        const betsPerChat = await Promise.all(
+          chats.map(async (chat) => {
+            try {
+              const res = await fetch(apiUrl(`/api/bets?chatId=${chat.chat_id}`))
+              if (!res.ok) return [] as HomeBet[]
+              const bets = (await res.json()) as BetResponse[]
+              if (!Array.isArray(bets)) return [] as HomeBet[]
+
+              return bets
+                .filter((bet) => bet.user_id === currentUser.user_id)
+                .map((bet) => {
+                  let details: ParsedBetDetails = {}
+                  try {
+                    details = JSON.parse(bet.prediction_details_json) as ParsedBetDetails
+                  } catch {
+                    // fallback to raw fields if malformed JSON
+                  }
+
+                  return {
+                    id: bet.bet_id,
+                    chatName: chat.chat_name ?? 'Unnamed Chat',
+                    category: bet.bet_category,
+                    pick: details.text?.trim() || 'Prediction',
+                    points: bet.points_wagered,
+                    status: bet.status,
+                    placedAt: bet.placed_at,
+                  }
+                })
+            } catch {
+              return [] as HomeBet[]
+            }
+          }),
+        )
+
+        if (cancelled) return
+
+        const flattened = betsPerChat
+          .flat()
+          .sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+          .slice(0, 8)
+          .map(({ placedAt, ...rest }) => rest)
+
+        setCurrentBets(flattened)
+      } finally {
+        if (!cancelled) setBetsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser.user_id])
 
   return (
     <div className="dashboard-page">
@@ -138,23 +207,31 @@ export default function HomePage({
             <section className="current-bets" aria-label="Current bets with friends">
               <div className="current-bets-header">
                 <h2>Current Bets With Friends</h2>
-                <span className="current-bets-count">{currentBets.length} active</span>
+                <span className="current-bets-count">{currentBets.length} placed</span>
               </div>
-              <div className="current-bets-list">
-                {currentBets.map((bet) => (
-                  <article className="current-bet-card" key={bet.id}>
-                    <div className="current-bet-top">
-                      <span className="current-bet-friend">vs {bet.friend}</span>
-                      <span className={`current-bet-status ${bet.status.toLowerCase()}`}>
-                        {bet.status}
-                      </span>
-                    </div>
-                    <p className="current-bet-matchup">{bet.matchup}</p>
-                    <p className="current-bet-pick">{bet.pick}</p>
-                    <p className="current-bet-points">{bet.points} pts at stake</p>
-                  </article>
-                ))}
-              </div>
+              {betsLoading ? (
+                <p className="current-bets-empty">Loading your bets…</p>
+              ) : currentBets.length === 0 ? (
+                <p className="current-bets-empty">
+                  No bets placed yet. Create a prediction in chat and your bets will show up here.
+                </p>
+              ) : (
+                <div className="current-bets-list">
+                  {currentBets.map((bet) => (
+                    <article className="current-bet-card" key={bet.id}>
+                      <div className="current-bet-top">
+                        <span className="current-bet-friend">{bet.chatName}</span>
+                        <span className={`current-bet-status ${bet.status.toLowerCase()}`}>
+                          {bet.status}
+                        </span>
+                      </div>
+                      <p className="current-bet-matchup">{bet.category}</p>
+                      <p className="current-bet-pick">{bet.pick}</p>
+                      <p className="current-bet-points">{bet.points} pts wagered</p>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             <div className="home-actions">

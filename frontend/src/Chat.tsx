@@ -17,13 +17,37 @@ import type {
 type Message = {
   id: number;
   sender: string;
+  senderUserId: number;
   text: string;
   timestamp: string;
   isOwn: boolean;
 };
 
-type RawMessage = {
-  message_id: number;
+type Member = {
+  user_id: number;
+  username: string;
+  points_balance: number;
+  is_king: boolean;
+};
+
+type Sport = 'Basketball' | 'Football';
+type PredictionCategory = 'Points' | 'Stats';
+
+type Prediction = {
+  sport: Sport;
+  category: PredictionCategory;
+  text: string;
+  minPoints: number;
+  maxPoints: number;
+  dueBy: string;
+  createdAt: string;
+  createdBy: string;
+};
+
+type BetResponse = {
+  bet_id: number;
+  chat_id: number;
+  game_id: number;
   user_id: number;
   message_text: string;
   sent_at: string;
@@ -81,6 +105,31 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [memberNames, setMemberNames] = useState<Map<number, string>>(new Map());
+  const [isPredictionOpen, setIsPredictionOpen] = useState(false);
+  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(
+    null
+  );
+  const [currentBetId, setCurrentBetId] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isEditingPrediction, setIsEditingPrediction] = useState(false);
+  const [memberNames, setMemberNames] = useState<Map<number, string>>(
+    new Map()
+  );
+  const [kingUsername, setKingUsername] = useState<string | null>(null);
+  const [kingUserId, setKingUserId] = useState<number | null>(null);
+  const [isCurrentUserKing, setIsCurrentUserKing] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [predictionDraft, setPredictionDraft] = useState({
+    sport: 'Basketball' as Sport,
+    category: 'Points' as PredictionCategory,
+    text: '',
+    minPoints: 10,
+    maxPoints: 100,
+    dueBy: '',
+  });
+  const [predictionTouched, setPredictionTouched] = useState(false);
+  const predictionSportRef = useRef<HTMLSelectElement | null>(null);
   const lastMessageIdRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -122,13 +171,25 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   useEffect(() => {
     fetch(apiUrl(`/api/chats/${chatId}/members`))
       .then((res) => res.json())
-      .then((data: Array<{ user_id: number; username: string }>) => {
+      .then((data: Member[]) => {
         const map = new Map<number, string>();
         data.forEach((m) => map.set(m.user_id, m.username));
         setMemberNames(map);
+        setMembers(data);
+
+        const king = data.find((m) => m.is_king);
+        if (king) {
+          setKingUsername(king.username);
+          setKingUserId(king.user_id);
+          setIsCurrentUserKing(king.user_id === currentUser.user_id);
+        } else {
+          setKingUsername(null);
+          setKingUserId(null);
+          setIsCurrentUserKing(false);
+        }
       })
       .catch(() => {});
-  }, [chatId]);
+  }, [chatId, currentUser.user_id]);
 
   const resolveMessage = useCallback(
     (m: RawMessage): Message => ({
@@ -137,6 +198,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         m.user_id === currentUser.user_id
           ? 'You'
           : (memberNames.get(m.user_id) ?? 'Unknown'),
+      senderUserId: m.user_id,
       text: m.message_text,
       timestamp: new Date(m.sent_at).toLocaleTimeString([], {
         hour: 'numeric',
@@ -300,6 +362,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       const newMessage: Message = {
         id: saved.message_id,
         sender: 'You',
+        senderUserId: currentUser.user_id,
         text: saved.message_text,
         timestamp: new Date(saved.sent_at).toLocaleTimeString([], {
           hour: 'numeric',
@@ -1095,17 +1158,37 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               the crown.
             </p>
             <div className="chat-title-actions">
+              {isCurrentUserKing ? (
+                <button
+                  type="button"
+                  className="make-prediction-button"
+                  onClick={() => setIsPredictionOpen(true)}
+                >
+                  Make a Prediction
+                </button>
+              ) : (
+                <span className="king-only-hint">
+                  Only the Chat King can make predictions
+                </span>
+              )}
               <button
                 type="button"
                 className="make-prediction-button"
                 onClick={openCreateModal}
               >
-                Make a Prediction
+                Members ({members.length})
               </button>
             </div>
           </div>
         </div>
         <div className="chat-meta">
+          {kingUsername && (
+            <span className="chat-pill king-pill">
+              {isCurrentUserKing
+                ? 'You hold the Crown'
+                : `${kingUsername} holds the Crown`}
+            </span>
+          )}
           <span className="chat-pill live-pill">Live</span>
           <span className="chat-pill points-pill">Points Only &middot; Zero Cash Risk</span>
         </div>
@@ -1126,7 +1209,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 )}
                 <div className="chat-message-bubble">
                   <div className="chat-message-header">
-                    <span className="chat-message-sender">{m.sender}</span>
+                    <span className="chat-message-sender">
+                      {m.sender}
+                      {m.senderUserId === kingUserId && (
+                        <svg className="crown-icon" viewBox="0 0 24 24" width="14" height="14" aria-label="Chat King">
+                          <path fill="#facc15" d="M2.5 19.5h19v2h-19v-2Zm19-11-5.5 4-4-6.5-4 6.5-5.5-4v11h19v-11Z" />
+                        </svg>
+                      )}
+                    </span>
                     <span className="chat-message-time">{m.timestamp}</span>
                   </div>
                   <p className="chat-message-text">{m.text}</p>
@@ -1158,6 +1248,252 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
       </main>
 
       {renderModal()}
+      {isMembersOpen && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setIsMembersOpen(false);
+          }}
+        >
+          <div
+            className="modal-shell"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chat Members"
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">Members</h2>
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="Close"
+                onClick={() => setIsMembersOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body members-list">
+              {members.map((m) => (
+                <div
+                  key={m.user_id}
+                  className={`member-row${m.user_id === currentUser.user_id ? ' member-row-self' : ''}`}
+                >
+                  <div className="member-row-left">
+                    <div className="chat-message-avatar" style={{ width: 34, height: 34, fontSize: '0.8rem' }}>
+                      {m.username.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="member-name">
+                      {m.username}
+                      {m.user_id === currentUser.user_id && (
+                        <span className="member-you-tag"> (You)</span>
+                      )}
+                    </span>
+                    {m.is_king && (
+                      <span className="member-king-badge">
+                        <svg className="crown-icon" viewBox="0 0 24 24" width="14" height="14" aria-label="Chat King">
+                          <path fill="#facc15" d="M2.5 19.5h19v2h-19v-2Zm19-11-5.5 4-4-6.5-4 6.5-5.5-4v11h19v-11Z" />
+                        </svg>
+                        Chat King
+                      </span>
+                    )}
+                  </div>
+                  <span className="member-points">{m.points_balance} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPredictionOpen && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closePrediction();
+          }}
+        >
+          <div
+            className="modal-shell"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Make a Prediction"
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">
+                {isEditingPrediction ? 'Edit Prediction' : 'Make a Prediction'}
+              </h2>
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="Close"
+                onClick={closePrediction}
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="modal-body" onSubmit={handleSubmitPrediction}>
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-sport">
+                  Select Sport
+                </label>
+                <select
+                  id="prediction-sport"
+                  className="modal-control"
+                  ref={predictionSportRef}
+                  value={predictionDraft.sport}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      sport: e.target.value as Sport,
+                    }))
+                  }
+                >
+                  <option value="Basketball">Basketball</option>
+                  <option value="Football">Football</option>
+                </select>
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-category">
+                  Prediction Category
+                </label>
+                <select
+                  id="prediction-category"
+                  className="modal-control"
+                  value={predictionDraft.category}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      category: e.target.value as PredictionCategory,
+                    }))
+                  }
+                >
+                  <option value="Points">Points</option>
+                  <option value="Stats">Stats</option>
+                </select>
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-text">
+                  Enter Your Prediction
+                </label>
+                <input
+                  id="prediction-text"
+                  type="text"
+                  className="modal-control"
+                  placeholder="E.g., Over 100 points, Team A wins, etc."
+                  value={predictionDraft.text}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      text: e.target.value,
+                    }))
+                  }
+                  onBlur={() => setPredictionTouched(true)}
+                />
+              </div>
+
+              <div className="modal-row">
+                <label className="modal-label" htmlFor="prediction-dueby">
+                  Bet due by
+                </label>
+                <input
+                  id="prediction-dueby"
+                  type="datetime-local"
+                  className="modal-control"
+                  value={predictionDraft.dueBy}
+                  onChange={(e) =>
+                    setPredictionDraft((prev) => ({
+                      ...prev,
+                      dueBy: e.target.value,
+                    }))
+                  }
+                  onBlur={() => setPredictionTouched(true)}
+                />
+                <div className="modal-help">
+                  For now, use the game start time so everyone knows when picks
+                  lock.
+                </div>
+              </div>
+
+              <div className="modal-grid">
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="prediction-min">
+                    Minimum Points to Bet
+                  </label>
+                  <input
+                    id="prediction-min"
+                    type="number"
+                    className="modal-control"
+                    min={0}
+                    step={1}
+                    value={predictionDraft.minPoints}
+                    onChange={(e) =>
+                      setPredictionDraft((prev) => ({
+                        ...prev,
+                        minPoints: Number(e.target.value),
+                      }))
+                    }
+                    onBlur={() => setPredictionTouched(true)}
+                  />
+                </div>
+                <div className="modal-row">
+                  <label className="modal-label" htmlFor="prediction-max">
+                    Maximum Points to Bet
+                  </label>
+                  <input
+                    id="prediction-max"
+                    type="number"
+                    className="modal-control"
+                    min={0}
+                    step={1}
+                    value={predictionDraft.maxPoints}
+                    onChange={(e) =>
+                      setPredictionDraft((prev) => ({
+                        ...prev,
+                        maxPoints: Number(e.target.value),
+                      }))
+                    }
+                    onBlur={() => setPredictionTouched(true)}
+                  />
+                </div>
+              </div>
+
+              {predictionTouched && predictionErrors.length > 0 && (
+                <div className="modal-error" role="alert">
+                  {predictionErrors[0]}
+                </div>
+              )}
+
+              {submitError && (
+                <div className="modal-error" role="alert">
+                  {submitError}
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-secondary-button"
+                  onClick={closePrediction}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="modal-primary-button"
+                  disabled={!canSubmitPrediction}
+                >
+                  {isEditingPrediction ? 'Save Prediction' : 'Make Prediction'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

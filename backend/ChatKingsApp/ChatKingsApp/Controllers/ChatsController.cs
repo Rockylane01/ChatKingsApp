@@ -52,6 +52,7 @@ public class ChatsController : ControllerBase
             return BadRequest("created_by_user_id is required.");
 
         chat.chat_id = 0;
+        chat.chat_king_user_id = chat.created_by_user_id;
         chat.created_at = DateTime.UtcNow;
         chat.updated_at = DateTime.UtcNow;
 
@@ -110,6 +111,9 @@ public class ChatsController : ControllerBase
     [HttpGet("{chatId}/members")]
     public async Task<ActionResult> GetMembers(int chatId)
     {
+        var chat = await _context.Chats.FindAsync(chatId);
+        var kingUserId = chat?.chat_king_user_id;
+
         var members = await _context.ChatMembers
             .Where(cm => cm.chat_id == chatId && cm.left_at == null)
             .Join(
@@ -123,6 +127,7 @@ public class ChatsController : ControllerBase
                     cm.points_balance,
                     cm.is_king,
                     cm.joined_at,
+                    is_king = cm.user_id == kingUserId,
                 })
             .ToListAsync();
 
@@ -162,5 +167,61 @@ public class ChatsController : ControllerBase
             .SumAsync(s => s.strike_value);
 
         return Ok(new { user_id = userId, chat_id = chatId, strikes_today = count, max_strikes = 3, locked = count >= 3 });
+    // GET api/chats/{chatId}/king
+    [HttpGet("{chatId}/king")]
+    public async Task<ActionResult> GetKing(int chatId)
+    {
+        var chat = await _context.Chats.FindAsync(chatId);
+        if (chat is null)
+            return NotFound("Chat not found.");
+
+        if (chat.chat_king_user_id is null)
+            return Ok(new { user_id = (int?)null, username = (string?)null });
+
+        var king = await _context.Users.FindAsync(chat.chat_king_user_id.Value);
+        if (king is null)
+            return Ok(new { user_id = (int?)null, username = (string?)null });
+
+        return Ok(new { king.user_id, king.username });
+    }
+
+    // POST api/chats/{chatId}/king/recalculate
+    [HttpPost("{chatId}/king/recalculate")]
+    public async Task<ActionResult> RecalculateKing(int chatId)
+    {
+        var chat = await _context.Chats.FindAsync(chatId);
+        if (chat is null)
+            return NotFound("Chat not found.");
+
+        var topMember = await _context.ChatMembers
+            .Where(cm => cm.chat_id == chatId && cm.left_at == null && cm.is_active)
+            .OrderByDescending(cm => cm.points_balance)
+            .FirstOrDefaultAsync();
+
+        if (topMember is null)
+            return Ok(new { user_id = (int?)null, username = (string?)null });
+
+        // Tie-breaking: if current king is tied for highest, they keep the crown
+        if (chat.chat_king_user_id.HasValue && chat.chat_king_user_id != topMember.user_id)
+        {
+            var currentKingMember = await _context.ChatMembers
+                .FirstOrDefaultAsync(cm => cm.chat_id == chatId
+                    && cm.user_id == chat.chat_king_user_id.Value
+                    && cm.left_at == null && cm.is_active);
+
+            if (currentKingMember != null && currentKingMember.points_balance >= topMember.points_balance)
+            {
+                // Current king is tied or ahead — keep the crown
+                var existingKing = await _context.Users.FindAsync(chat.chat_king_user_id.Value);
+                return Ok(new { existingKing?.user_id, existingKing?.username });
+            }
+        }
+
+        chat.chat_king_user_id = topMember.user_id;
+        chat.updated_at = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var newKing = await _context.Users.FindAsync(topMember.user_id);
+        return Ok(new { newKing?.user_id, newKing?.username });
     }
 }

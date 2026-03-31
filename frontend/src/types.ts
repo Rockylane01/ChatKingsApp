@@ -15,6 +15,9 @@ export interface Chat {
   created_by_user_id: number
   status: string
   timezone: string
+  admin_id: number
+  bet_permission: string
+  chat_king_user_id: number | null
   created_at: string
   updated_at: string
 }
