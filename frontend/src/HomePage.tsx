@@ -119,12 +119,15 @@ export default function HomePage({
 
         if (cancelled) return
 
+        const getCreatedAtSortTime = (createdAt?: string) => {
+          if (!createdAt) return Number.NEGATIVE_INFINITY
+          const timestamp = Date.parse(createdAt)
+          return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp
+        }
+
         const flattened = predsPerChat
           .flat()
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
-          )
+          .sort((a, b) => getCreatedAtSortTime(b.createdAt) - getCreatedAtSortTime(a.createdAt))
           .slice(0, 8)
           .map(({ createdAt, ...rest }) => rest)
 

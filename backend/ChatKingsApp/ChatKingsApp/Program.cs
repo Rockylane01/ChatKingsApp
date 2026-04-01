@@ -141,19 +141,6 @@ static string NormalizePostgresConnectionString(string raw)
 {
     var trimmed = raw.Trim().Trim('"');
 
-    // Some hosts store envs as KEY=VALUE lines and may accidentally pass that full
-    // string as the value for ConnectionStrings__DefaultConnection.
-    var equalsIdx = trimmed.IndexOf('=');
-    if (equalsIdx > 0)
-    {
-        var maybeKey = trimmed[..equalsIdx].Trim();
-        if (maybeKey.Equals("ConnectionStrings__DefaultConnection", StringComparison.OrdinalIgnoreCase) ||
-            maybeKey.Equals("ConnectionStrings:DefaultConnection", StringComparison.OrdinalIgnoreCase))
-        {
-            trimmed = trimmed[(equalsIdx + 1)..].Trim();
-        }
-    }
-
     if (!trimmed.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
         !trimmed.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
     {
