@@ -139,7 +139,21 @@ app.Run();
 
 static string NormalizePostgresConnectionString(string raw)
 {
-    var trimmed = raw.Trim();
+    var trimmed = raw.Trim().Trim('"');
+
+    // Some hosts store envs as KEY=VALUE lines and may accidentally pass that full
+    // string as the value for ConnectionStrings__DefaultConnection.
+    var equalsIdx = trimmed.IndexOf('=');
+    if (equalsIdx > 0)
+    {
+        var maybeKey = trimmed[..equalsIdx].Trim();
+        if (maybeKey.Equals("ConnectionStrings__DefaultConnection", StringComparison.OrdinalIgnoreCase) ||
+            maybeKey.Equals("ConnectionStrings:DefaultConnection", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[(equalsIdx + 1)..].Trim();
+        }
+    }
+
     if (!trimmed.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
         !trimmed.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
     {
@@ -156,10 +170,12 @@ static string NormalizePostgresConnectionString(string raw)
     var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
     var database = uri.AbsolutePath.Trim('/');
 
+    var port = uri.Port > 0 ? uri.Port : 5432;
+
     var builder = new Npgsql.NpgsqlConnectionStringBuilder
     {
         Host = uri.Host,
-        Port = uri.IsDefaultPort ? 5432 : uri.Port,
+        Port = port,
         Database = database,
         Username = username,
         Password = password,
