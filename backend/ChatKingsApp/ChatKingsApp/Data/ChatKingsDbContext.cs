@@ -5,7 +5,7 @@ namespace ChatKingsApp.Data;
 
 public class ChatKingsDbContext : DbContext
 {
-    public ChatKingsDbContext(DbContextOptions<ChatKingsDbContext> options)
+    public ChatKingsDbContext(DbContextOptions options)
         : base(options)
     {
     }

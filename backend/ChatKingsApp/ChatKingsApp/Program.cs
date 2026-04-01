@@ -50,8 +50,54 @@ builder.Services.AddHttpClient("GameResolution");
 builder.Services.AddHostedService<GameResolutionService>();
 builder.Services.AddHostedService<WeeklyResetService>();
 builder.Services.AddCors();
-builder.Services.AddDbContext<ChatKingsDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+var configuredProvider = builder.Configuration["DatabaseProvider"];
+var databaseProvider = string.IsNullOrWhiteSpace(configuredProvider)
+    ? (builder.Environment.IsDevelopment() ? "Sqlite" : "Postgres")
+    : configuredProvider.Trim();
+
+var useSqlite = string.Equals(databaseProvider, "Sqlite", StringComparison.OrdinalIgnoreCase);
+var usePostgres = string.Equals(databaseProvider, "Postgres", StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(databaseProvider, "PostgreSQL", StringComparison.OrdinalIgnoreCase);
+
+if (useSqlite)
+{
+    builder.Services.AddDbContext<ChatKingsDbContext>(options =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                               ?? "Data Source=ChatKings.db";
+        options.UseSqlite(
+            connectionString,
+            sqlite => sqlite.MigrationsAssembly(typeof(ChatKingsDbContext).Assembly.GetName().Name));
+    });
+}
+else if (usePostgres)
+{
+    builder.Services.AddDbContext<ChatKingsPostgresDbContext>(options =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException(
+                "Postgres is selected but ConnectionStrings:DefaultConnection is not configured.");
+        if (connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "Postgres is selected but ConnectionStrings:DefaultConnection appears to be a SQLite connection string. Set a PostgreSQL connection string (for example: Host=...;Port=5432;Database=...;Username=...;Password=...).");
+
+        options.UseNpgsql(
+            connectionString,
+            npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(ChatKingsPostgresDbContext).Assembly.GetName().Name);
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "public");
+            });
+    });
+    builder.Services.AddScoped<ChatKingsDbContext>(sp =>
+        sp.GetRequiredService<ChatKingsPostgresDbContext>());
+}
+else
+{
+    throw new InvalidOperationException(
+        $"Unsupported DatabaseProvider '{databaseProvider}'. Use 'Sqlite' or 'Postgres'.");
+}
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

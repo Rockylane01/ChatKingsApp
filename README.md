@@ -26,6 +26,22 @@ dotnet run
 
 The API will start at `http://localhost:5135`.
 
+### Backend Database Configuration
+
+The backend supports SQLite for development and PostgreSQL for production.
+
+- Local development defaults to SQLite (`ChatKings.db`) via `appsettings.Development.json`.
+- Production defaults to PostgreSQL and requires `ConnectionStrings__DefaultConnection`.
+- You can override provider selection with `DatabaseProvider` (`Sqlite` or `Postgres`).
+
+Example production env:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Production
+DatabaseProvider=Postgres
+ConnectionStrings__DefaultConnection=Host=<host>;Port=5432;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true
+```
+
 ### Start the Frontend
 
 ```bash
