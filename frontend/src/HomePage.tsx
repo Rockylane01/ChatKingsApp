@@ -10,21 +10,15 @@ interface HomePageProps {
 }
 
 type WagersTotalResponse = { totalWagers?: number }
-type BetResponse = {
-  bet_id: number
+type PredictionResponse = {
+  prediction_id: number
   chat_id: number
-  user_id: number
-  bet_category: string
-  prediction_details_json: string
-  points_wagered: number
+  created_by_user_id: number
+  title: string
   status: string
-  placed_at: string
-}
-type ParsedBetDetails = {
-  text?: string
-  dueBy?: string
-  minPoints?: number
-  maxPoints?: number
+  pot_points: number
+  created_at: string
+  options: { option_id: number; option_label: string; wager_count: number; total_points: number }[]
 }
 type HomeBet = {
   id: number
@@ -99,34 +93,23 @@ export default function HomePage({
           return
         }
 
-        const betsPerChat = await Promise.all(
+        const predsPerChat = await Promise.all(
           chats.map(async (chat) => {
             try {
-              const res = await fetch(apiUrl(`/api/bets?chatId=${chat.chat_id}`))
+              const res = await fetch(apiUrl(`/api/predictions?chatId=${chat.chat_id}`))
               if (!res.ok) return [] as HomeBet[]
-              const bets = (await res.json()) as BetResponse[]
-              if (!Array.isArray(bets)) return [] as HomeBet[]
+              const preds = (await res.json()) as PredictionResponse[]
+              if (!Array.isArray(preds)) return [] as HomeBet[]
 
-              return bets
-                .filter((bet) => bet.user_id === currentUser.user_id)
-                .map((bet) => {
-                  let details: ParsedBetDetails = {}
-                  try {
-                    details = JSON.parse(bet.prediction_details_json) as ParsedBetDetails
-                  } catch {
-                    // fallback to raw fields if malformed JSON
-                  }
-
-                  return {
-                    id: bet.bet_id,
-                    chatName: chat.chat_name ?? 'Unnamed Chat',
-                    category: bet.bet_category,
-                    pick: details.text?.trim() || 'Prediction',
-                    points: bet.points_wagered,
-                    status: bet.status,
-                    placedAt: bet.placed_at,
-                  }
-                })
+              return preds.map((pred) => ({
+                id: pred.prediction_id,
+                chatName: chat.chat_name ?? 'Unnamed Chat',
+                category: pred.status === 'resolved' ? 'Resolved' : 'Active',
+                pick: pred.title,
+                points: pred.pot_points,
+                status: pred.status,
+                createdAt: pred.created_at,
+              }))
             } catch {
               return [] as HomeBet[]
             }
@@ -135,11 +118,11 @@ export default function HomePage({
 
         if (cancelled) return
 
-        const flattened = betsPerChat
+        const flattened = predsPerChat
           .flat()
-          .sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
           .slice(0, 8)
-          .map(({ placedAt, ...rest }) => rest)
+          .map(({ createdAt, ...rest }) => rest)
 
         setCurrentBets(flattened)
       } finally {

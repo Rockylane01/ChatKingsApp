@@ -30,26 +30,13 @@ type Member = {
   is_king: boolean;
 };
 
-type Sport = 'Basketball' | 'Football';
-type PredictionCategory = 'Points' | 'Stats';
-
-type Prediction = {
-  sport: Sport;
-  category: PredictionCategory;
-  text: string;
-  minPoints: number;
-  maxPoints: number;
-  dueBy: string;
-  createdAt: string;
-  createdBy: string;
-};
-
-type BetResponse = {
-  bet_id: number;
+type RawMessage = {
+  message_id: number;
   chat_id: number;
-  game_id: number;
   user_id: number;
+  message_type: string;
   message_text: string;
+  prediction_id: number | null;
   sent_at: string;
 };
 
@@ -105,31 +92,11 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [memberNames, setMemberNames] = useState<Map<number, string>>(new Map());
-  const [isPredictionOpen, setIsPredictionOpen] = useState(false);
-  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(
-    null
-  );
-  const [currentBetId, setCurrentBetId] = useState<number | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isEditingPrediction, setIsEditingPrediction] = useState(false);
-  const [memberNames, setMemberNames] = useState<Map<number, string>>(
-    new Map()
-  );
   const [kingUsername, setKingUsername] = useState<string | null>(null);
   const [kingUserId, setKingUserId] = useState<number | null>(null);
   const [isCurrentUserKing, setIsCurrentUserKing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
-  const [predictionDraft, setPredictionDraft] = useState({
-    sport: 'Basketball' as Sport,
-    category: 'Points' as PredictionCategory,
-    text: '',
-    minPoints: 10,
-    maxPoints: 100,
-    dueBy: '',
-  });
-  const [predictionTouched, setPredictionTouched] = useState(false);
-  const predictionSportRef = useRef<HTMLSelectElement | null>(null);
   const lastMessageIdRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -655,7 +622,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                     {isUserChoice && ' \u2713'}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
-                    {opt.total_wagered} pts wagered &middot; {opt.wager_count} bettor
+                    {opt.total_points} pts wagered &middot; {opt.wager_count} bettor
                     {opt.wager_count !== 1 ? 's' : ''}
                   </div>
                 </div>
@@ -1158,23 +1125,17 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               the crown.
             </p>
             <div className="chat-title-actions">
-              {isCurrentUserKing ? (
-                <button
-                  type="button"
-                  className="make-prediction-button"
-                  onClick={() => setIsPredictionOpen(true)}
-                >
-                  Make a Prediction
-                </button>
-              ) : (
-                <span className="king-only-hint">
-                  Only the Chat King can make predictions
-                </span>
-              )}
               <button
                 type="button"
                 className="make-prediction-button"
                 onClick={openCreateModal}
+              >
+                Make a Prediction
+              </button>
+              <button
+                type="button"
+                className="make-prediction-button"
+                onClick={() => setIsMembersOpen(true)}
               >
                 Members ({members.length})
               </button>
@@ -1306,194 +1267,7 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
         </div>
       )}
 
-      {isPredictionOpen && (
-        <div
-          className="modal-overlay"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closePrediction();
-          }}
-        >
-          <div
-            className="modal-shell"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Make a Prediction"
-          >
-            <div className="modal-header">
-              <h2 className="modal-title">
-                {isEditingPrediction ? 'Edit Prediction' : 'Make a Prediction'}
-              </h2>
-              <button
-                type="button"
-                className="modal-close-button"
-                aria-label="Close"
-                onClick={closePrediction}
-              >
-                ×
-              </button>
-            </div>
-
-            <form className="modal-body" onSubmit={handleSubmitPrediction}>
-              <div className="modal-row">
-                <label className="modal-label" htmlFor="prediction-sport">
-                  Select Sport
-                </label>
-                <select
-                  id="prediction-sport"
-                  className="modal-control"
-                  ref={predictionSportRef}
-                  value={predictionDraft.sport}
-                  onChange={(e) =>
-                    setPredictionDraft((prev) => ({
-                      ...prev,
-                      sport: e.target.value as Sport,
-                    }))
-                  }
-                >
-                  <option value="Basketball">Basketball</option>
-                  <option value="Football">Football</option>
-                </select>
-              </div>
-
-              <div className="modal-row">
-                <label className="modal-label" htmlFor="prediction-category">
-                  Prediction Category
-                </label>
-                <select
-                  id="prediction-category"
-                  className="modal-control"
-                  value={predictionDraft.category}
-                  onChange={(e) =>
-                    setPredictionDraft((prev) => ({
-                      ...prev,
-                      category: e.target.value as PredictionCategory,
-                    }))
-                  }
-                >
-                  <option value="Points">Points</option>
-                  <option value="Stats">Stats</option>
-                </select>
-              </div>
-
-              <div className="modal-row">
-                <label className="modal-label" htmlFor="prediction-text">
-                  Enter Your Prediction
-                </label>
-                <input
-                  id="prediction-text"
-                  type="text"
-                  className="modal-control"
-                  placeholder="E.g., Over 100 points, Team A wins, etc."
-                  value={predictionDraft.text}
-                  onChange={(e) =>
-                    setPredictionDraft((prev) => ({
-                      ...prev,
-                      text: e.target.value,
-                    }))
-                  }
-                  onBlur={() => setPredictionTouched(true)}
-                />
-              </div>
-
-              <div className="modal-row">
-                <label className="modal-label" htmlFor="prediction-dueby">
-                  Bet due by
-                </label>
-                <input
-                  id="prediction-dueby"
-                  type="datetime-local"
-                  className="modal-control"
-                  value={predictionDraft.dueBy}
-                  onChange={(e) =>
-                    setPredictionDraft((prev) => ({
-                      ...prev,
-                      dueBy: e.target.value,
-                    }))
-                  }
-                  onBlur={() => setPredictionTouched(true)}
-                />
-                <div className="modal-help">
-                  For now, use the game start time so everyone knows when picks
-                  lock.
-                </div>
-              </div>
-
-              <div className="modal-grid">
-                <div className="modal-row">
-                  <label className="modal-label" htmlFor="prediction-min">
-                    Minimum Points to Bet
-                  </label>
-                  <input
-                    id="prediction-min"
-                    type="number"
-                    className="modal-control"
-                    min={0}
-                    step={1}
-                    value={predictionDraft.minPoints}
-                    onChange={(e) =>
-                      setPredictionDraft((prev) => ({
-                        ...prev,
-                        minPoints: Number(e.target.value),
-                      }))
-                    }
-                    onBlur={() => setPredictionTouched(true)}
-                  />
-                </div>
-                <div className="modal-row">
-                  <label className="modal-label" htmlFor="prediction-max">
-                    Maximum Points to Bet
-                  </label>
-                  <input
-                    id="prediction-max"
-                    type="number"
-                    className="modal-control"
-                    min={0}
-                    step={1}
-                    value={predictionDraft.maxPoints}
-                    onChange={(e) =>
-                      setPredictionDraft((prev) => ({
-                        ...prev,
-                        maxPoints: Number(e.target.value),
-                      }))
-                    }
-                    onBlur={() => setPredictionTouched(true)}
-                  />
-                </div>
-              </div>
-
-              {predictionTouched && predictionErrors.length > 0 && (
-                <div className="modal-error" role="alert">
-                  {predictionErrors[0]}
-                </div>
-              )}
-
-              {submitError && (
-                <div className="modal-error" role="alert">
-                  {submitError}
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="modal-secondary-button"
-                  onClick={closePrediction}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="modal-primary-button"
-                  disabled={!canSubmitPrediction}
-                >
-                  {isEditingPrediction ? 'Save Prediction' : 'Make Prediction'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Old prediction modal removed — replaced by the 3-step modal (renderModal) */}
     </div>
   );
 }

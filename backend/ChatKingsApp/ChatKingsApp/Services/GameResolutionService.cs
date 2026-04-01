@@ -261,11 +261,20 @@ public class GameResolutionService : BackgroundService
             var topMember = members.OrderByDescending(m => m.points_balance).First();
             var currentKing = members.FirstOrDefault(m => m.is_king);
 
-            if (currentKing == null || currentKing.chat_member_id != topMember.chat_member_id)
+            if (currentKing == null ||
+                (currentKing.chat_member_id != topMember.chat_member_id && topMember.points_balance > currentKing.points_balance))
             {
                 foreach (var m in members)
                     m.is_king = false;
                 topMember.is_king = true;
+
+                // Sync Chat.chat_king_user_id
+                var chat = await db.Chats.FindAsync(new object[] { chatId }, ct);
+                if (chat != null)
+                {
+                    chat.chat_king_user_id = topMember.user_id;
+                    chat.updated_at = DateTime.UtcNow;
+                }
             }
         }
 

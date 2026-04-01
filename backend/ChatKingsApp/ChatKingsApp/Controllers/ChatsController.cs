@@ -125,9 +125,8 @@ public class ChatsController : ControllerBase
                     cm.user_id,
                     u.username,
                     cm.points_balance,
-                    cm.is_king,
+                    is_king = kingUserId.HasValue ? cm.user_id == kingUserId : cm.is_king,
                     cm.joined_at,
-                    is_king = cm.user_id == kingUserId,
                 })
             .ToListAsync();
 
@@ -167,6 +166,8 @@ public class ChatsController : ControllerBase
             .SumAsync(s => s.strike_value);
 
         return Ok(new { user_id = userId, chat_id = chatId, strikes_today = count, max_strikes = 3, locked = count >= 3 });
+    }
+
     // GET api/chats/{chatId}/king
     [HttpGet("{chatId}/king")]
     public async Task<ActionResult> GetKing(int chatId)

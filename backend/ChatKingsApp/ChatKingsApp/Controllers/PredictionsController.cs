@@ -615,17 +615,22 @@ public class PredictionsController : ControllerBase
         var currentKing = chatMembers.FirstOrDefault(m => m.is_king);
         var topMember = chatMembers.OrderByDescending(m => m.points_balance).FirstOrDefault();
 
-        if (currentKing is not null && topMember is not null
-            && topMember.user_id != currentKing.user_id
-            && topMember.points_balance > currentKing.points_balance)
+        if (topMember is not null &&
+            (currentKing is null || (topMember.user_id != currentKing.user_id && topMember.points_balance > currentKing.points_balance)))
         {
-            currentKing.is_king = false;
+            // Clear all is_king flags, then set new King
+            foreach (var cm in chatMembers)
+                cm.is_king = false;
             topMember.is_king = true;
-            await _context.SaveChangesAsync();
-        }
-        else if (currentKing is null && topMember is not null)
-        {
-            topMember.is_king = true;
+
+            // Also sync Chat.chat_king_user_id
+            var chat = await _context.Chats.FindAsync(prediction.chat_id);
+            if (chat is not null)
+            {
+                chat.chat_king_user_id = topMember.user_id;
+                chat.updated_at = DateTime.UtcNow;
+            }
+
             await _context.SaveChangesAsync();
         }
 

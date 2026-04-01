@@ -37,7 +37,7 @@ export interface PredictionOption {
   team_id: number | null
   display_order: number
   wager_count: number
-  total_wagered: number
+  total_points: number
 }
 
 export interface PredictionWager {
