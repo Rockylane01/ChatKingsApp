@@ -27,6 +27,7 @@ type HomeBet = {
   pick: string
   points: number
   status: string
+  createdAt?: string
 }
 
 export default function HomePage({
@@ -120,7 +121,10 @@ export default function HomePage({
 
         const flattened = predsPerChat
           .flat()
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+          )
           .slice(0, 8)
           .map(({ createdAt, ...rest }) => rest)
 

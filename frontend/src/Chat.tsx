@@ -5,7 +5,6 @@ import type {
   User,
   TickerGame,
   PredictionDetail,
-  PredictionOption,
   LeaderboardEntry,
   StrikeInfo,
 } from './types';
