@@ -109,6 +109,23 @@ public class UsersController : ControllerBase
         return user is null ? NotFound() : Ok(user);
     }
 
+    // GET api/users/search?username={}&excludeUserId={}
+    [HttpGet("search")]
+    public async Task<ActionResult<IEnumerable<object>>> SearchUsers([FromQuery] string username, [FromQuery] int? excludeUserId)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+            return Ok(Array.Empty<object>());
+
+        var query = _context.Users.Where(u => u.username.ToLower().Contains(username.ToLower()));
+
+        if (excludeUserId.HasValue)
+            query = query.Where(u => u.user_id != excludeUserId.Value);
+
+        var users = await query.Select(u => new { u.user_id, u.username }).Take(10).ToListAsync();
+
+        return Ok(users);
+    }
+
     // GET api/users/by-add-code/{addCode}
     [HttpGet("by-add-code/{addCode}")]
     public async Task<ActionResult<User>> GetUserByAddCode(string addCode)

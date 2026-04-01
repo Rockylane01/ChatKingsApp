@@ -97,6 +97,14 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
   const [isCurrentUserKing, setIsCurrentUserKing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+
+  // Invite state (members modal)
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteResults, setInviteResults] = useState<{ user_id: number; username: string }[]>([]);
+  const [inviteStatus, setInviteStatus] = useState<Record<number, 'sending' | 'sent' | 'already'>>({});
+  const [pendingInvites, setPendingInvites] = useState<{ user_id: number; username: string }[]>([]);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const inviteSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMessageIdRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -540,6 +548,74 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
     } catch {
       setModalError('Network error. Please try again.');
     }
+  };
+
+
+  // Debounced invite search — tries username and add code simultaneously
+  useEffect(() => {
+    if (inviteSearchTimeout.current) clearTimeout(inviteSearchTimeout.current);
+    if (inviteQuery.trim().length < 2) { setInviteResults([]); return; }
+    inviteSearchTimeout.current = setTimeout(async () => {
+      try {
+        const q = inviteQuery.trim();
+        console.log('[invite-search] searching for:', q);
+        const memberIds = new Set(members.map((m) => m.user_id));
+        const seen = new Set<number>();
+        const combined: { user_id: number; username: string }[] = [];
+
+        const [usernameRes, codeRes] = await Promise.allSettled([
+          fetch(apiUrl(`/api/users/search?username=${encodeURIComponent(q)}&excludeUserId=${currentUser.user_id}`)),
+          fetch(apiUrl(`/api/users/by-add-code/${encodeURIComponent(q)}`)),
+        ]);
+
+        if (usernameRes.status === 'fulfilled' && usernameRes.value.ok) {
+          const results: { user_id: number; username: string }[] = await usernameRes.value.json();
+          for (const u of results) {
+            if (!memberIds.has(u.user_id) && !seen.has(u.user_id)) {
+              combined.push(u);
+              seen.add(u.user_id);
+            }
+          }
+        }
+
+        if (codeRes.status === 'fulfilled' && codeRes.value.ok) {
+          const u: { user_id: number; username: string } = await codeRes.value.json();
+          if (u.user_id !== currentUser.user_id && !memberIds.has(u.user_id) && !seen.has(u.user_id)) {
+            combined.push(u);
+          }
+        }
+
+        console.log('[invite-search] combined results:', combined, 'memberIds:', [...memberIds]);
+        setInviteResults(combined);
+      } catch (err) { console.error('[invite-search] error:', err); }
+    }, 300);
+  }, [inviteQuery, members, currentUser.user_id]);
+
+  const handleInviteUser = async (userId: number) => {
+    setInviteStatus((prev) => ({ ...prev, [userId]: 'sending' }));
+    try {
+      const res = await fetch(apiUrl(`/api/chats/${chatId}/invite`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invited_user_id: userId, invited_by_user_id: currentUser.user_id }),
+      });
+      if (res.ok) {
+        setInviteStatus((prev) => ({ ...prev, [userId]: 'sent' }));
+        const invited = inviteResults.find((u) => u.user_id === userId);
+        if (invited) setPendingInvites((prev) => [...prev, invited]);
+      } else {
+        setInviteStatus((prev) => ({ ...prev, [userId]: 'already' }));
+      }
+    } catch {
+      setInviteStatus((prev) => ({ ...prev, [userId]: 'already' }));
+    }
+  };
+
+  const handleLeaveChat = async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/chats/${chatId}/leave?userId=${currentUser.user_id}`), { method: 'POST' });
+      if (res.ok) onBack();
+    } catch { /* ignore */ }
   };
 
   /* ================================================================ */
@@ -1135,9 +1211,23 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
               <button
                 type="button"
                 className="make-prediction-button"
-                onClick={() => setIsMembersOpen(true)}
+                onClick={() => {
+                  setIsMembersOpen(true);
+                  fetch(apiUrl(`/api/chats/${chatId}/pending-invites`))
+                    .then((r) => r.ok ? r.json() : [])
+                    .then(setPendingInvites)
+                    .catch(() => {});
+                }}
               >
                 Members ({members.length})
+              </button>
+              <button
+                type="button"
+                className="make-prediction-button"
+                style={{ color: '#f87171', borderColor: 'rgba(239,68,68,0.4)' }}
+                onClick={() => setIsLeaveConfirmOpen(true)}
+              >
+                Leave Chat
               </button>
             </div>
           </div>
@@ -1214,7 +1304,10 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
           className="modal-overlay"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setIsMembersOpen(false);
+            if (e.target === e.currentTarget) {
+              setIsMembersOpen(false);
+              setInviteQuery(''); setInviteResults([]);
+            }
           }}
         >
           <div
@@ -1229,7 +1322,10 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                 type="button"
                 className="modal-close-button"
                 aria-label="Close"
-                onClick={() => setIsMembersOpen(false)}
+                onClick={() => {
+                  setIsMembersOpen(false);
+                  setInviteQuery(''); setInviteResults([]);
+                }}
               >
                 ×
               </button>
@@ -1262,6 +1358,93 @@ export default function Chat({ currentUser, chatId, onBack }: ChatProps) {
                   <span className="member-points">{m.points_balance} pts</span>
                 </div>
               ))}
+
+              {/* Pending Invites section */}
+              {pendingInvites.length > 0 && (
+                <div style={{ borderTop: '1px solid rgba(148,163,184,0.12)', paddingTop: '0.5rem' }}>
+                  <div style={{ padding: '0.5rem 1rem 0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Invited
+                  </div>
+                  {pendingInvites.map((u) => (
+                    <div key={u.user_id} className="member-row">
+                      <div className="member-row-left">
+                        <div className="chat-message-avatar" style={{ width: 34, height: 34, fontSize: '0.8rem', opacity: 0.5 }}>
+                          {u.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="member-name" style={{ color: '#9ca3af' }}>{u.username}</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Pending</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Invite Friends section */}
+              <div style={{ borderTop: '1px solid rgba(148,163,184,0.12)', paddingTop: '0.5rem' }}>
+                <div style={{ padding: '0.5rem 1rem 0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Invite Friends
+                </div>
+                <div style={{ padding: '0 1rem 0.6rem' }}>
+                  <input
+                    type="text"
+                    className="modal-control"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Search by username or add code…"
+                    value={inviteQuery}
+                    onChange={(e) => setInviteQuery(e.target.value)}
+                  />
+                </div>
+                {inviteResults.map((u) => (
+                  <div key={u.user_id} className="member-row">
+                    <div className="member-row-left">
+                      <div className="chat-message-avatar" style={{ width: 34, height: 34, fontSize: '0.8rem' }}>
+                        {u.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="member-name">{u.username}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="modal-primary-button"
+                      style={{ padding: '0.25rem 0.9rem', fontSize: '0.78rem' }}
+                      disabled={inviteStatus[u.user_id] === 'sending' || inviteStatus[u.user_id] === 'sent'}
+                      onClick={() => handleInviteUser(u.user_id)}
+                    >
+                      {inviteStatus[u.user_id] === 'sent' ? 'Invited!' :
+                       inviteStatus[u.user_id] === 'already' ? 'Already invited' :
+                       inviteStatus[u.user_id] === 'sending' ? '…' : 'Invite'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Chat confirm popup */}
+      {isLeaveConfirmOpen && (
+        <div className="modal-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setIsLeaveConfirmOpen(false); }}>
+          <div className="modal-shell" role="dialog" aria-modal="true" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Leave Chat</h2>
+              <button type="button" className="modal-close-button" aria-label="Close" onClick={() => setIsLeaveConfirmOpen(false)}>×</button>
+            </div>
+            <div style={{ padding: '1.25rem 1.1rem 0.5rem', color: '#d1d5db', fontSize: '0.92rem' }}>
+              Are you sure you want to leave this chat? You'll need to be invited again to rejoin.
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem', padding: '1rem 1.1rem 1.25rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="nav-link-button" style={{ padding: '0.45rem 1rem' }} onClick={() => setIsLeaveConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-primary-button"
+                style={{ padding: '0.45rem 1.1rem', background: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.5)', color: '#f87171' }}
+                onClick={() => { setIsLeaveConfirmOpen(false); handleLeaveChat(); }}
+              >
+                Leave
+              </button>
             </div>
           </div>
         </div>

@@ -22,6 +22,18 @@ export interface Chat {
   updated_at: string
 }
 
+export interface ChatInvitation {
+  chat_id: number
+  chat_name: string | null
+  created_at: string
+  invited_by_username: string | null
+}
+
+export interface UserSearchResult {
+  user_id: number
+  username: string
+}
+
 export interface TickerGame {
   id: string
   league: string

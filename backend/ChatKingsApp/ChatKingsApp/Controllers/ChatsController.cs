@@ -25,7 +25,7 @@ public class ChatsController : ControllerBase
         if (userId.HasValue)
         {
             var chatIds = await _context.ChatMembers
-                .Where(cm => cm.user_id == userId.Value && cm.left_at == null)
+                .Where(cm => cm.user_id == userId.Value && cm.left_at == null && cm.status == "active")
                 .Select(cm => cm.chat_id)
                 .ToListAsync();
 
@@ -115,7 +115,7 @@ public class ChatsController : ControllerBase
         var kingUserId = chat?.chat_king_user_id;
 
         var members = await _context.ChatMembers
-            .Where(cm => cm.chat_id == chatId && cm.left_at == null)
+            .Where(cm => cm.chat_id == chatId && cm.left_at == null && cm.status == "active")
             .Join(
                 _context.Users,
                 cm => cm.user_id,
@@ -225,4 +225,129 @@ public class ChatsController : ControllerBase
         var newKing = await _context.Users.FindAsync(topMember.user_id);
         return Ok(new { newKing?.user_id, newKing?.username });
     }
+
+    // POST api/chats/{chatId}/invite
+    [HttpPost("{chatId}/invite")]
+    public async Task<ActionResult> InviteUser(int chatId, [FromBody] InviteRequest req)
+    {
+        var chat = await _context.Chats.FindAsync(chatId);
+        if (chat is null)
+            return NotFound("Chat not found.");
+
+        var existing = await _context.ChatMembers
+            .FirstOrDefaultAsync(cm => cm.chat_id == chatId && cm.user_id == req.invited_user_id && cm.left_at == null);
+
+        if (existing is not null)
+            return BadRequest("User is already a member or has a pending invite.");
+
+        var member = new ChatMember
+        {
+            chat_id = chatId,
+            user_id = req.invited_user_id,
+            role = "member",
+            points_balance = 0,
+            joined_at = DateTime.UtcNow,
+            is_active = false,
+            status = "invited",
+            invited_by_user_id = req.invited_by_user_id,
+        };
+
+        _context.ChatMembers.Add(member);
+        await _context.SaveChangesAsync();
+
+        return Ok(member);
+    }
+
+    // GET api/chats/invitations?userId={}
+    [HttpGet("invitations")]
+    public async Task<ActionResult> GetInvitations([FromQuery] int userId)
+    {
+        var rows = await _context.ChatMembers
+            .Where(cm => cm.user_id == userId && cm.status == "invited" && cm.left_at == null)
+            .Join(_context.Chats, cm => cm.chat_id, c => c.chat_id,
+                (cm, c) => new { c.chat_id, c.chat_name, c.created_at, cm.invited_by_user_id })
+            .ToListAsync();
+
+        var result = new List<object>();
+        foreach (var row in rows)
+        {
+            string? invitedByUsername = null;
+            if (row.invited_by_user_id.HasValue)
+            {
+                var inviter = await _context.Users.FindAsync(row.invited_by_user_id.Value);
+                invitedByUsername = inviter?.username;
+            }
+            result.Add(new { row.chat_id, row.chat_name, row.created_at, invited_by_username = invitedByUsername });
+        }
+
+        return Ok(result);
+    }
+
+    // GET api/chats/{chatId}/pending-invites
+    [HttpGet("{chatId}/pending-invites")]
+    public async Task<ActionResult> GetPendingInvites(int chatId)
+    {
+        var rows = await _context.ChatMembers
+            .Where(cm => cm.chat_id == chatId && cm.status == "invited" && cm.left_at == null)
+            .Join(_context.Users, cm => cm.user_id, u => u.user_id,
+                (cm, u) => new { u.user_id, u.username })
+            .ToListAsync();
+
+        return Ok(rows);
+    }
+
+    // POST api/chats/{chatId}/accept-invite?userId={}
+    [HttpPost("{chatId}/accept-invite")]
+    public async Task<ActionResult> AcceptInvite(int chatId, [FromQuery] int userId)
+    {
+        var member = await _context.ChatMembers
+            .FirstOrDefaultAsync(cm => cm.chat_id == chatId && cm.user_id == userId && cm.status == "invited");
+
+        if (member is null)
+            return NotFound("Invitation not found.");
+
+        member.status = "active";
+        member.is_active = true;
+        member.points_balance = 1000;
+        member.joined_at = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return Ok(member);
+    }
+
+    // POST api/chats/{chatId}/decline-invite?userId={}
+    [HttpPost("{chatId}/decline-invite")]
+    public async Task<ActionResult> DeclineInvite(int chatId, [FromQuery] int userId)
+    {
+        var member = await _context.ChatMembers
+            .FirstOrDefaultAsync(cm => cm.chat_id == chatId && cm.user_id == userId && cm.status == "invited");
+
+        if (member is null)
+            return NotFound("Invitation not found.");
+
+        _context.ChatMembers.Remove(member);
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    // POST api/chats/{chatId}/leave?userId={}
+    [HttpPost("{chatId}/leave")]
+    public async Task<ActionResult> LeaveChat(int chatId, [FromQuery] int userId)
+    {
+        var member = await _context.ChatMembers
+            .FirstOrDefaultAsync(cm => cm.chat_id == chatId && cm.user_id == userId && cm.left_at == null && cm.status == "active");
+
+        if (member is null)
+            return NotFound("You are not a member of this chat.");
+
+        member.left_at = DateTime.UtcNow;
+        member.is_active = false;
+        member.status = "left";
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
 }
+
+public record InviteRequest(int invited_user_id, int invited_by_user_id);
