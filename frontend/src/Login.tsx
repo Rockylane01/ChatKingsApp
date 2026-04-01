@@ -31,6 +31,10 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       }
 
       if (!res.ok) {
+        if (res.status >= 500) {
+          setError('Service is temporarily unavailable. Please try again shortly.')
+          return
+        }
         setError('Something went wrong. Try again.')
         return
       }
@@ -38,11 +42,19 @@ export default function Login({ onLogin, onBack }: LoginProps) {
       const user: User = await res.json()
       sessionStorage.setItem('currentUser', JSON.stringify(user))
       onLogin(user)
-    } catch {
-      setError('Network error. Is the backend running?')
+    } catch (err) {
+      setError(toNetworkErrorMessage(err))
     } finally {
       setLoading(false)
     }
+  }
+
+  function toNetworkErrorMessage(err: unknown): string {
+    const message = err instanceof Error ? err.message.toLowerCase() : ''
+    if (message.includes('failed to fetch') || message.includes('network')) {
+      return 'Unable to reach the API right now. Please try again in a minute.'
+    }
+    return 'Network error. Please try again.'
   }
 
   return (

@@ -27,6 +27,7 @@ type HomeBet = {
   pick: string
   points: number
   status: string
+  createdAt?: string
 }
 
 export default function HomePage({
@@ -118,9 +119,15 @@ export default function HomePage({
 
         if (cancelled) return
 
+        const getCreatedAtSortTime = (createdAt?: string) => {
+          if (!createdAt) return Number.NEGATIVE_INFINITY
+          const timestamp = Date.parse(createdAt)
+          return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp
+        }
+
         const flattened = predsPerChat
           .flat()
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .sort((a, b) => getCreatedAtSortTime(b.createdAt) - getCreatedAtSortTime(a.createdAt))
           .slice(0, 8)
           .map(({ createdAt, ...rest }) => rest)
 

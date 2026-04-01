@@ -49,6 +49,7 @@ public class GameResolutionService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<ChatKingsDbContext>();
 
         var pendingPredictions = await db.Predictions
+            .AsSplitQuery()
             .Include(p => p.Options)
             .Include(p => p.Wagers)
             .Where(p => p.status == "pending"
