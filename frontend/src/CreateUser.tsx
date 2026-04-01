@@ -48,6 +48,10 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
       })
 
       if (!res.ok) {
+        if (res.status >= 500) {
+          setError('Service is temporarily unavailable. Please try again shortly.')
+          return
+        }
         const text = await res.text()
         setError(text || 'Failed to create user.')
         return
@@ -65,11 +69,19 @@ export default function CreateUser({ onBack, onCreated }: CreateUserProps) {
       setProfileImageUrl('')
       setPassword('')
       setConfirmPassword('')
-    } catch {
-      setError('Network error. Is the backend running?')
+    } catch (err) {
+      setError(toNetworkErrorMessage(err))
     } finally {
       setLoading(false)
     }
+  }
+
+  function toNetworkErrorMessage(err: unknown): string {
+    const message = err instanceof Error ? err.message.toLowerCase() : ''
+    if (message.includes('failed to fetch') || message.includes('network')) {
+      return 'Unable to reach the API right now. Please try again in a minute.'
+    }
+    return 'Network error. Please try again.'
   }
 
   return (
