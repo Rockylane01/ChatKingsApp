@@ -14,4 +14,6 @@ public class ChatMember
     public DateTime? left_at { get; set; }
     public bool is_active { get; set; }
     public bool is_king { get; set; }
+    public string status { get; set; } = "active";
+    public int? invited_by_user_id { get; set; }
 }

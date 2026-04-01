@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiUrl } from './apiBase'
-import type { User, Chat } from './types'
+import type { User, Chat, ChatInvitation } from './types'
 
 interface ChatListProps {
   currentUser: User
@@ -11,23 +11,21 @@ interface ChatListProps {
 
 export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout }: ChatListProps) {
   const [myChats, setMyChats] = useState<Chat[]>([])
-  const [allChats, setAllChats] = useState<Chat[]>([])
+  const [invitations, setInvitations] = useState<ChatInvitation[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newChatName, setNewChatName] = useState('')
   const [newChatTimezone, setNewChatTimezone] = useState('America/New_York')
   const [createError, setCreateError] = useState('')
-  const [joiningId, setJoiningId] = useState<number | null>(null)
 
   const fetchChats = async () => {
     try {
-      const [myRes, allRes] = await Promise.all([
+      const [myRes, invRes] = await Promise.all([
         fetch(apiUrl(`/api/chats?userId=${currentUser.user_id}`)),
-        fetch(apiUrl('/api/chats')),
+        fetch(apiUrl(`/api/chats/invitations?userId=${currentUser.user_id}`)),
       ])
-
       if (myRes.ok) setMyChats(await myRes.json())
-      if (allRes.ok) setAllChats(await allRes.json())
+      if (invRes.ok) setInvitations(await invRes.json())
     } catch {
       // backend not reachable
     } finally {
@@ -38,9 +36,6 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
   useEffect(() => {
     fetchChats()
   }, [currentUser.user_id])
-
-  const myChatIds = new Set(myChats.map((c) => c.chat_id))
-  const joinableChats = allChats.filter((c) => !myChatIds.has(c.chat_id))
 
   const handleCreateChat = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,21 +74,30 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
     }
   }
 
-  const handleJoinChat = async (chatId: number) => {
-    setJoiningId(chatId)
+  const handleAcceptInvite = async (chatId: number) => {
     try {
       const res = await fetch(
-        apiUrl(`/api/chats/${chatId}/join?userId=${currentUser.user_id}`),
+        apiUrl(`/api/chats/${chatId}/accept-invite?userId=${currentUser.user_id}`),
         { method: 'POST' }
       )
-
       if (res.ok) {
         await fetchChats()
+        onSelectChat(chatId)
       }
     } catch {
       // network error
-    } finally {
-      setJoiningId(null)
+    }
+  }
+
+  const handleDeclineInvite = async (chatId: number) => {
+    try {
+      await fetch(
+        apiUrl(`/api/chats/${chatId}/decline-invite?userId=${currentUser.user_id}`),
+        { method: 'POST' }
+      )
+      setInvitations((prev) => prev.filter((i) => i.chat_id !== chatId))
+    } catch {
+      // network error
     }
   }
 
@@ -113,12 +117,8 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
           <span style={{ fontSize: '0.8rem', color: '#9ca3af', marginRight: '0.5rem' }}>
             {currentUser.username}
           </span>
-          <button type="button" className="nav-link-button" onClick={onGoHome}>
-            Home
-          </button>
-          <button type="button" className="nav-link-button" onClick={onLogout}>
-            Sign Out
-          </button>
+          <button type="button" className="nav-link-button" onClick={onGoHome}>Home</button>
+          <button type="button" className="nav-link-button" onClick={onLogout}>Sign Out</button>
         </div>
       </nav>
 
@@ -128,7 +128,7 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
           type="button"
           className="modal-primary-button"
           style={{ padding: '0.45rem 1.2rem', fontSize: '0.82rem' }}
-          onClick={() => setShowCreateForm(!showCreateForm)}
+          onClick={() => { setShowCreateForm(!showCreateForm); setCreateError('') }}
         >
           {showCreateForm ? 'Cancel' : '+ New Chat'}
         </button>
@@ -165,9 +165,9 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
         <p className="chat-list-empty">Loading chats…</p>
       ) : (
         <>
-          {myChats.length === 0 ? (
+          {myChats.length === 0 && invitations.length === 0 ? (
             <p className="chat-list-empty">
-              You haven't joined any chats yet. Create one or join an existing chat below!
+              You haven't joined any chats yet. Create one or ask a friend to invite you!
             </p>
           ) : (
             <div className="chat-list-grid">
@@ -195,30 +195,43 @@ export default function ChatList({ currentUser, onSelectChat, onGoHome, onLogout
             </div>
           )}
 
-          {joinableChats.length > 0 && (
+          {invitations.length > 0 && (
             <>
-              <h2 className="chat-list-section-title">Join a Chat</h2>
+              <h2 className="chat-list-section-title">Invitations</h2>
               <div className="chat-list-grid">
-                {joinableChats.map((chat) => (
-                  <div key={chat.chat_id} className="chat-list-item" style={{ cursor: 'default' }}>
+                {invitations.map((inv) => (
+                  <div key={inv.chat_id} className="chat-list-item" style={{ cursor: 'default' }}>
                     <div className="chat-list-item-left">
                       <div className="chat-avatar" style={{ width: 40, height: 40, fontSize: '0.9rem' }}>
-                        {(chat.chat_name ?? 'C').charAt(0).toUpperCase()}
+                        {(inv.chat_name ?? 'C').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="chat-list-item-name">{chat.chat_name ?? 'Unnamed Chat'}</div>
-                        <div className="chat-list-item-date">Created {formatDate(chat.created_at)}</div>
+                        <div className="chat-list-item-name">{inv.chat_name ?? 'Unnamed Chat'}</div>
+                        <div className="chat-list-item-date">
+                          {inv.invited_by_username
+                            ? `${inv.invited_by_username} invited you to join`
+                            : `Created ${formatDate(inv.created_at)}`}
+                        </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="modal-primary-button"
-                      style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
-                      disabled={joiningId === chat.chat_id}
-                      onClick={() => handleJoinChat(chat.chat_id)}
-                    >
-                      {joiningId === chat.chat_id ? 'Joining…' : 'Join'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        type="button"
+                        className="modal-primary-button"
+                        style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
+                        onClick={() => handleAcceptInvite(inv.chat_id)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className="nav-link-button"
+                        style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                        onClick={() => handleDeclineInvite(inv.chat_id)}
+                      >
+                        Decline
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
