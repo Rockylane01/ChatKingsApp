@@ -82,6 +82,8 @@ else if (usePostgres)
             throw new InvalidOperationException(
                 "Postgres is selected but ConnectionStrings:DefaultConnection appears to be a SQLite connection string. Set a PostgreSQL connection string (for example: Host=...;Port=5432;Database=...;Username=...;Password=...).");
 
+        connectionString = NormalizePostgresConnectionString(connectionString);
+
         options.UseNpgsql(
             connectionString,
             npgsql =>
@@ -134,3 +136,51 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string NormalizePostgresConnectionString(string raw)
+{
+    var trimmed = raw.Trim();
+    if (!trimmed.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
+        !trimmed.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        return trimmed;
+    }
+
+    if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+    {
+        throw new InvalidOperationException("Invalid Postgres URL format in ConnectionStrings:DefaultConnection.");
+    }
+
+    var userInfo = uri.UserInfo.Split(':', 2, StringSplitOptions.None);
+    var username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty;
+    var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+    var database = uri.AbsolutePath.Trim('/');
+
+    var builder = new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.IsDefaultPort ? 5432 : uri.Port,
+        Database = database,
+        Username = username,
+        Password = password,
+        SslMode = Npgsql.SslMode.Prefer
+    };
+
+    if (!string.IsNullOrWhiteSpace(uri.Query))
+    {
+        foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2, StringSplitOptions.None);
+            var key = Uri.UnescapeDataString(parts[0]);
+            var value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+
+            if (key.Equals("sslmode", StringComparison.OrdinalIgnoreCase) &&
+                Enum.TryParse<Npgsql.SslMode>(value, true, out var sslMode))
+            {
+                builder.SslMode = sslMode;
+            }
+        }
+    }
+
+    return builder.ConnectionString;
+}
